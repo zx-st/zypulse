@@ -1,0 +1,81 @@
+{
+  "_meta": {
+    "persona": "Mr Tan",
+    "age": 55,
+    "location": "Tampines, Singapore",
+    "condition": "Type 2 Diabetes",
+    "medication": "Metformin 500mg twice daily",
+    "occupation": "Office worker (full-time)",
+    "data_period_days": 30,
+    "source": "DEMO/SYNTHETIC",
+    "generated_by": "WorkBuddy",
+    "notes": "All data is fictional. Glucose values in mmol/L. Intentional gaps included for testing missing-data handling."
+  },
+  "user_profile": {
+    "user_id": "mr_tan_001",
+    "name": "Mr Tan",
+    "age": 55,
+    "gender": "male",
+    "language_preference": "en",
+    "location_general": "East Singapore (Tampines)",
+    "condition": "Type 2 Diabetes",
+    "diagnosis_year": 2021,
+    "medications": [
+      {"name": "Metformin", "dose": "500mg", "frequency": "twice daily", "prescribed_by": "Dr Lim (GP)"}
+    ],
+    "targets": {
+      "fasting_glucose_min": 4.0,
+      "fasting_glucose_max": 7.0,
+      "notes": "General target range. Individual targets set by clinician."
+    },
+    "goals": [
+      "Maintain fasting glucose below 7.0 mmol/L",
+      "Walk 30 minutes at least 5 days a week",
+      "Take medication consistently"
+    ],
+    "barriers": [
+      "Busy work schedule sometimes leads to skipped evening walks",
+      "Occasionally forgets morning medication when rushing to office"
+    ],
+    "activity_preferences": ["walking", "group exercise", "parks"],
+    "availability": ["weekday evenings", "weekend mornings"]
+  },
+  "daily_records": [
+    {"date": "2025-08-01", "fasting_glucose": 7.2, "evening_glucose": 8.1, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 30, "location": "Tampines Eco Green"}, "notes": ""},
+    {"date": "2025-08-02", "fasting_glucose": 6.9, "evening_glucose": 7.8, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 25, "location": "neighbourhood"}, "notes": ""},
+    {"date": "2025-08-03", "fasting_glucose": 7.5, "evening_glucose": 9.2, "medication_morning": "missed", "medication_evening": "taken", "activity": null, "notes": "Rushed morning, forgot medication. Busy day at office."},
+    {"date": "2025-08-04", "fasting_glucose": 8.1, "evening_glucose": 8.5, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 40, "location": "Bedok Reservoir"}, "notes": "Weekend longer walk. Feeling better."},
+    {"date": "2025-08-05", "fasting_glucose": 7.0, "evening_glucose": 7.4, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 30, "location": "Tampines Eco Green"}, "notes": ""},
+    {"date": "2025-08-06", "fasting_glucose": 6.8, "evening_glucose": 7.6, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 20, "location": "office vicinity"}, "notes": "Short walk during lunch break."},
+    {"date": "2025-08-07", "fasting_glucose": 7.3, "evening_glucose": null, "medication_morning": "taken", "medication_evening": "missed", "activity": null, "notes": "Late meeting, missed evening dose. Did not check evening glucose."},
+    {"date": "2025-08-08", "fasting_glucose": 8.4, "evening_glucose": 8.9, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 35, "location": "East Coast Park"}, "notes": "Higher fasting reading, likely due to missed evening dose yesterday."},
+    {"date": "2025-08-09", "fasting_glucose": 7.1, "evening_glucose": 7.2, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 45, "location": "East Coast Park"}, "notes": "National Day weekend. Good long walk."},
+    {"date": "2025-08-10", "fasting_glucose": 6.5, "evening_glucose": 6.9, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 30, "location": "Tampines Eco Green"}, "notes": "Best fasting reading this period."},
+    {"date": "2025-08-11", "fasting_glucose": 6.7, "evening_glucose": 7.3, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 25, "location": "neighbourhood"}, "notes": ""},
+    {"date": "2025-08-12", "fasting_glucose": 7.0, "evening_glucose": 7.9, "medication_morning": "taken", "medication_evening": "taken", "activity": null, "notes": "Rainy day, no walk."},
+    {"date": "2025-08-13", "fasting_glucose": 7.4, "evening_glucose": 8.2, "medication_morning": "missed", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 20, "location": "office vicinity"}, "notes": "Forgot morning dose again. Need reminder system."},
+    {"date": "2025-08-14", "fasting_glucose": 8.0, "evening_glucose": 8.6, "medication_morning": "taken", "medication_evening": "taken", "activity": null, "notes": ""},
+    {"date": "2025-08-15", "fasting_glucose": 7.6, "evening_glucose": 7.8, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 40, "location": "Bedok Reservoir"}, "notes": ""},
+    {"date": "2025-08-16", "fasting_glucose": 6.9, "evening_glucose": 7.1, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 50, "location": "East Coast Park"}, "notes": "Great weekend walk. Felt energetic."},
+    {"date": "2025-08-17", "fasting_glucose": 6.6, "evening_glucose": 7.0, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 30, "location": "Tampines Eco Green"}, "notes": ""},
+    {"date": "2025-08-18", "fasting_glucose": 6.8, "evening_glucose": null, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 25, "location": "neighbourhood"}, "notes": "Forgot to check evening glucose."},
+    {"date": "2025-08-19", "fasting_glucose": 7.2, "evening_glucose": 7.7, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 30, "location": "Tampines Eco Green"}, "notes": ""},
+    {"date": "2025-08-20", "fasting_glucose": 7.1, "evening_glucose": 8.0, "medication_morning": "taken", "medication_evening": "taken", "activity": null, "notes": "Busy at work, no walk."},
+    {"date": "2025-08-21", "fasting_glucose": 7.5, "evening_glucose": 8.3, "medication_morning": "missed", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 20, "location": "office vicinity"}, "notes": "Early meeting, missed morning dose."},
+    {"date": "2025-08-22", "fasting_glucose": 8.2, "evening_glucose": 8.7, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 35, "location": "Bedok Reservoir"}, "notes": ""},
+    {"date": "2025-08-23", "fasting_glucose": 7.0, "evening_glucose": 7.3, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 45, "location": "East Coast Park"}, "notes": ""},
+    {"date": "2025-08-24", "fasting_glucose": 6.7, "evening_glucose": 7.0, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 30, "location": "Tampines Eco Green"}, "notes": ""},
+    {"date": "2025-08-25", "fasting_glucose": 6.9, "evening_glucose": 7.4, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 25, "location": "neighbourhood"}, "notes": ""},
+    {"date": "2025-08-26", "fasting_glucose": null, "evening_glucose": 8.1, "medication_morning": "taken", "medication_evening": "taken", "activity": null, "notes": "Forgot to check fasting glucose. No walk."},
+    {"date": "2025-08-27", "fasting_glucose": 7.3, "evening_glucose": 7.9, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 30, "location": "Tampines Eco Green"}, "notes": ""},
+    {"date": "2025-08-28", "fasting_glucose": 7.0, "evening_glucose": 7.5, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 40, "location": "Bedok Reservoir"}, "notes": ""},
+    {"date": "2025-08-29", "fasting_glucose": 6.8, "evening_glucose": 7.2, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 35, "location": "East Coast Park"}, "notes": ""},
+    {"date": "2025-08-30", "fasting_glucose": 6.6, "evening_glucose": 6.8, "medication_morning": "taken", "medication_evening": "taken", "activity": {"type": "walking", "duration_min": 45, "location": "East Coast Park"}, "notes": "Good readings today. Consistent medication and walks are helping."}
+  ],
+  "conversation_history_seed": [
+    {"role": "user", "content": "Hi, I'm Mr Tan. I want to manage my diabetes better.", "timestamp": "2025-08-01T08:00:00"},
+    {"role": "assistant", "content": "Hello Mr Tan! I'm ZyPulse, your self-care companion. I can help you track your glucose readings, medication, and activity, and provide educational support. Let's start by understanding your routine. What time do you usually check your fasting glucose?", "timestamp": "2025-08-01T08:01:00"},
+    {"role": "user", "content": "Usually around 7am before breakfast.", "timestamp": "2025-08-01T08:02:00"},
+    {"role": "assistant", "content": "That's a good routine. Fasting glucose readings before breakfast give a clear picture of your baseline blood sugar. Would you like to log today's reading?", "timestamp": "2025-08-01T08:03:00"}
+  ]
+}

@@ -1,0 +1,191 @@
+{
+  "_meta": {
+    "source": "DEMO/SYNTHETIC",
+    "generated_by": "WorkBuddy",
+    "notes": "All foods, carbohydrate and sugar figures are illustrative estimates for prototype demonstration only. They are NOT clinically precise and must not be used for dosing or medical decisions.",
+    "portion_options": ["0.25", "0.5", "0.75", "1", "1.5", "2", "custom"],
+    "base_values_are_per": "1 portion (portion_key '1')"
+  },
+  "foods": [
+    {
+      "food_id": "nasi_lemak",
+      "name": "Nasi Lemak",
+      "category": "rice",
+      "base_carbs": 53.0,
+      "base_sugar": 1.5,
+      "is_sugary_drink": false,
+      "tags": ["rice", "malay", "coconut", "main"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "chicken_rice",
+      "name": "Chicken Rice",
+      "category": "rice",
+      "base_carbs": 50.0,
+      "base_sugar": 1.0,
+      "is_sugary_drink": false,
+      "tags": ["rice", "chinese", "main"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "laksa",
+      "name": "Laksa (curry noodle)",
+      "category": "noodle",
+      "base_carbs": 45.0,
+      "base_sugar": 3.0,
+      "is_sugary_drink": false,
+      "tags": ["noodle", "peranakan", "spicy", "main"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "char_kway_teow",
+      "name": "Char Kway Teow",
+      "category": "noodle",
+      "base_carbs": 58.0,
+      "base_sugar": 4.0,
+      "is_sugary_drink": false,
+      "tags": ["noodle", "chinese", "fried", "main"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "hokkien_mee",
+      "name": "Hokkien Mee",
+      "category": "noodle",
+      "base_carbs": 48.0,
+      "base_sugar": 3.0,
+      "is_sugary_drink": false,
+      "tags": ["noodle", "chinese", "prawn", "main"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "mee_soto",
+      "name": "Mee Soto",
+      "category": "noodle",
+      "base_carbs": 42.0,
+      "base_sugar": 2.0,
+      "is_sugary_drink": false,
+      "tags": ["noodle", "malay", "soup", "main"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "wan_ton_noodle",
+      "name": "Wanton Noodle",
+      "category": "noodle",
+      "base_carbs": 47.0,
+      "base_sugar": 3.0,
+      "is_sugary_drink": false,
+      "tags": ["noodle", "chinese", "soup", "main"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "nasi_goreng",
+      "name": "Nasi Goreng (fried rice)",
+      "category": "rice",
+      "base_carbs": 55.0,
+      "base_sugar": 6.0,
+      "is_sugary_drink": false,
+      "tags": ["rice", "fried", "indonesian", "main"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "roti_prata",
+      "name": "Roti Prata (1 piece)",
+      "category": "bread",
+      "base_carbs": 40.0,
+      "base_sugar": 2.0,
+      "is_sugary_drink": false,
+      "tags": ["bread", "indian", "flatbread"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "fish_soup",
+      "name": "Fish Soup (with rice)",
+      "category": "soup",
+      "base_carbs": 20.0,
+      "base_sugar": 2.0,
+      "is_sugary_drink": false,
+      "tags": ["soup", "chinese", "fish", "rice"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "vegetable_curry",
+      "name": "Vegetable Curry (side)",
+      "category": "vegetable",
+      "base_carbs": 12.0,
+      "base_sugar": 3.0,
+      "is_sugary_drink": false,
+      "tags": ["vegetable", "indian", "side"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "kaya_toast",
+      "name": "Kaya Toast (2 slices)",
+      "category": "snack",
+      "base_carbs": 30.0,
+      "base_sugar": 8.0,
+      "is_sugary_drink": false,
+      "tags": ["snack", "breakfast", "toast", "sweet"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "tau_huay",
+      "name": "Tau Huay (soybean pudding)",
+      "category": "snack",
+      "base_carbs": 18.0,
+      "base_sugar": 10.0,
+      "is_sugary_drink": false,
+      "tags": ["snack", "dessert", "sweet", "soy"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "teh_tarik",
+      "name": "Teh Tarik (sweetened milk tea)",
+      "category": "drink",
+      "base_carbs": 22.0,
+      "base_sugar": 18.0,
+      "is_sugary_drink": true,
+      "tags": ["drink", "sweetened", "tea", "sugary"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "milo",
+      "name": "Milo (sweetened cocoa drink)",
+      "category": "drink",
+      "base_carbs": 20.0,
+      "base_sugar": 16.0,
+      "is_sugary_drink": true,
+      "tags": ["drink", "sweetened", "chocolate", "sugary"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "bandung",
+      "name": "Bandung (rose syrup milk)",
+      "category": "drink",
+      "base_carbs": 28.0,
+      "base_sugar": 24.0,
+      "is_sugary_drink": true,
+      "tags": ["drink", "sweetened", "sugary", "syrup"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "green_tea_unsweetened",
+      "name": "Green Tea (unsweetened)",
+      "category": "drink",
+      "base_carbs": 0.0,
+      "base_sugar": 0.0,
+      "is_sugary_drink": false,
+      "tags": ["drink", "unsweetened", "tea"],
+      "source": "DEMO/SYNTHETIC"
+    },
+    {
+      "food_id": "water",
+      "name": "Water",
+      "category": "drink",
+      "base_carbs": 0.0,
+      "base_sugar": 0.0,
+      "is_sugary_drink": false,
+      "tags": ["drink", "unsweetened", "plain"],
+      "source": "DEMO/SYNTHETIC"
+    }
+  ]
+}
