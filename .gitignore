@@ -1,0 +1,11 @@
+# Python virtual environments and bytecode
+.venv/
+**/.venv/
+__pycache__/
+*.py[cod]
+
+# Node and pnpm dependencies/cache
+node_modules/
+.pnpm-store/
+.vite/
+dist/
