@@ -87,22 +87,25 @@ export default function DailyBriefingPage({ userId, language, setPage }) {
       )}
 
       <section className="daily-ai-card">
-        <div className="card-title">AI briefing</div>
-        <p>{analysis?.analysis || 'Preparing your data-based briefing...'}</p>
+        <div className="daily-ai-heading">
+          <div className="card-title"><span className="daily-ai-icon">✦</span>AI briefing</div>
+          <span className="daily-ai-source">Based on your records</span>
+        </div>
+        <BriefingInsight text={analysis?.analysis || 'Preparing your data-based briefing...'} />
         {analysis?.safety_status && analysis.safety_status !== 'allow' && <span className={`chat-safety-badge safety-${analysis.safety_status}`}>{analysis.safety_status === 'fallback' ? 'Deterministic mode' : 'Safety filtered'}</span>}
       </section>
 
-      <section className="card">
+      <section className="card daily-continue-card">
         <div className="card-title">Continue with ZyPulse</div>
         <div className="daily-links">
-          <button onClick={() => setPage('log')}>Log a reading</button>
-          <button onClick={() => setPage('meals')}>Add a meal</button>
-          <button onClick={() => setPage('trends')}>View trends</button>
-          <button onClick={() => setPage('chat')}>Ask Coach</button>
+          <button onClick={() => setPage('log')}><span className="quick-action-icon">🩸</span><span>Log a reading</span></button>
+          <button onClick={() => setPage('meals')}><span className="quick-action-icon">🍽️</span><span>Add a meal</span></button>
+          <button onClick={() => setPage('trends')}><span className="quick-action-icon">📈</span><span>View trends</span></button>
+          <button onClick={() => setPage('chat')}><span className="quick-action-icon">💬</span><span>Ask Coach</span></button>
         </div>
       </section>
 
-      <section className="card">
+      <section className="card daily-record-card">
         <div className="card-title">Your record at a glance</div>
         <BriefingTrend label="Fasting glucose · 7 days" value={fasting.average == null ? '—' : `${fasting.average} mmol/L`} trend={fasting} />
         <BriefingTrend label="Medication · 30 days" value={medication.adherence_rate == null ? '—' : `${medication.adherence_rate}%`} trend={medication} />
@@ -143,6 +146,12 @@ function getMissingHealthProfileItems(preferences = {}) {
 function BriefingTrend({ label, value, trend }) {
   const direction = trend.trend_direction || 'insufficient_data'
   return <div className="trend-row"><span className="trend-label">{label}</span><span className="trend-value">{value} <span className={`trend-badge ${badgeClass[direction] || 'badge-insufficient'}`}>{badgeLabel[direction] || direction}</span></span></div>
+}
+
+function BriefingInsight({ text }) {
+  const match = text.match(/^(.+?[.!?])\s*(.*)$/s)
+  if (!match) return <p className="daily-ai-insight">{text}</p>
+  return <div className="daily-ai-insight"><strong>{match[1]}</strong>{match[2] && <span>{match[2]}</span>}</div>
 }
 
 function chooseAction({ fasting, evening, medication, activity, meals }) {

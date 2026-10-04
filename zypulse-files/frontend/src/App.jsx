@@ -37,7 +37,7 @@ export default function App() {
       <div className="safety-banner">
         ZyPulse is a self-care support prototype, not a medical device. Consult your doctor for medical advice.
       </div>
-      <main className="main">
+      <main className={`main page-${page}`}>
         {pages[page]}
       </main>
       <NavBar page={page} setPage={setPage} />
