@@ -80,13 +80,15 @@ zyPulse/
 - ✅ Fallback mode works when LLM not configured
 - ✅ All numbers in responses come from C3 calculation engine
 
-## To Enable LLM (Optional)
+## To Enable OpenAI (Coach and Daily Briefing)
 
-Set environment variables:
-```bash
-export ZYPULSE_LLM_API_URL="https://api.openai.com/v1/chat/completions"
-export ZYPULSE_LLM_API_KEY="your-api-key"
-export ZYPULSE_LLM_MODEL="gpt-4o-mini"
+Create `backend/.env` from `backend/.env.example` and set `OPENAI_API_KEY` to a project API key. Do not put a key in frontend code or commit it.
+
+For PowerShell, set it for the current backend session before starting FastAPI:
+```powershell
+$env:OPENAI_API_KEY="your-project-api-key"
+$env:OPENAI_MODEL="gpt-5.4-mini"
+python -m uvicorn backend.main:app --reload --port 8000
 ```
 
-Or use Tencent Hunyuan API. The app works in fallback mode without this.
+The app uses OpenAI's Responses API with `store: false`; if a key is absent, it stays in deterministic fallback mode. The generic `ZYPULSE_LLM_*` configuration remains supported for an OpenAI-compatible or Tencent Hunyuan endpoint.

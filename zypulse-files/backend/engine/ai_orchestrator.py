@@ -70,11 +70,20 @@ TONE:
 - Focus on actionable self-care steps within the user's control
 - Never use fear-based messaging
 
+PERSONALISATION:
+- Use a user-shared goal, barrier, preference, location, or recent conversation only when relevant.
+- Make one concrete connection rather than giving a generic list of tips.
+- You may restate a number only when it appears in the deterministic context or a user-shared goal.
+- Do not infer personal facts that are not in the deterministic or user-shared context.
+
 FORMAT:
 - Keep responses concise (3-5 sentences for conversational replies)
 - Use plain language
 - If the context contains trend data, reference it naturally
 """
+
+BRIEFING_PROMPT = """Create a short Daily Briefing analysis using only the deterministic context.
+Write two concise sentences: first describe only the available record or trend; second suggest one low-risk logging, reflection, or care-conversation action. If the user-shared context is relevant, make one specific connection to it; otherwise do not force personalisation. Do not diagnose, assess medical risk, prescribe, claim causation, or introduce any number that is not in the context. State when the available data is limited."""
 
 
 class AIOrchestrator:
@@ -85,13 +94,14 @@ class AIOrchestrator:
 
     def __init__(self, safety_engine: SafetyEngine):
         self.safety = safety_engine
+        self.openai_api_key = os.environ.get("OPENAI_API_KEY", "")
         self.api_url = os.environ.get("ZYPULSE_LLM_API_URL", "")
         self.api_key = os.environ.get("ZYPULSE_LLM_API_KEY", "")
-        self.model = os.environ.get("ZYPULSE_LLM_MODEL", "hunyuan-standard")
+        self.model = os.environ.get("OPENAI_MODEL", os.environ.get("ZYPULSE_LLM_MODEL", "gpt-5.4-mini"))
 
     def is_configured(self) -> bool:
         """Check if LLM API is configured."""
-        return bool(self.api_url and self.api_key)
+        return bool(self.openai_api_key or (self.api_url and self.api_key))
 
     def generate_response(
         self,
@@ -135,6 +145,22 @@ class AIOrchestrator:
             "safety_detail": screen_result["reason"],
             "trends": context,
         }
+
+    def generate_briefing(self, context: Dict[str, Any], language: str = "en") -> Dict[str, Any]:
+        """Generate a short, safe explanation for the Daily Briefing screen."""
+        prompt = self._assemble_prompt(BRIEFING_PROMPT, context, language)
+        try:
+            if not self.is_configured():
+                return self._fallback_briefing(context, "LLM not configured")
+            llm_response = self._call_llm(prompt)
+            screen_result = self.safety.screen_output(llm_response, context)
+            return {
+                "response": screen_result["filtered_response"],
+                "safety_status": "blocked" if not screen_result["allowed"] else ("filtered" if screen_result["action"] == "filtered" else "allow"),
+                "safety_detail": screen_result["reason"],
+            }
+        except Exception as e:
+            return self._fallback_briefing(context, f"LLM error: {str(e)}")
 
     def _assemble_prompt(
         self,
@@ -216,10 +242,28 @@ class AIOrchestrator:
                 lines.append(f"  - Total duration: {act['total_duration_min']} minutes")
                 lines.append(f"  - Average per session: {act['avg_duration_min']} min")
 
+        user_context = context.get("user_context", {})
+        if user_context:
+            lines.append("\nUser-shared context (use only when relevant; do not infer beyond it):")
+            fields = [
+                ("Name", "display_name"), ("Area", "location_area"), ("Goals", "goals"),
+                ("Reported barriers", "barriers"), ("Activity preferences", "activity_types"),
+                ("Availability", "availability"),
+            ]
+            for label, key in fields:
+                value = user_context.get(key)
+                if value:
+                    if isinstance(value, list):
+                        value = "; ".join(str(item) for item in value)
+                    lines.append(f"  - {label}: {value}")
+
         return "\n".join(lines) if lines else "No deterministic data available."
 
     def _call_llm(self, messages: list) -> str:
         """Make the actual LLM API call."""
+        if self.openai_api_key:
+            return self._call_openai_responses(messages)
+
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
@@ -251,6 +295,29 @@ class AIOrchestrator:
                     return choice["Message"]["Content"].strip()
 
         return ""
+
+    def _call_openai_responses(self, messages: list) -> str:
+        """Call OpenAI's Responses API; the key remains server-side only."""
+        instructions = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
+        input_messages = [
+            {"role": m["role"], "content": m["content"]}
+            for m in messages if m["role"] in ("user", "assistant")
+        ]
+        response = requests.post(
+            "https://api.openai.com/v1/responses",
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.openai_api_key}"},
+            json={"model": self.model, "instructions": instructions, "input": input_messages, "max_output_tokens": 220, "store": False},
+            timeout=20,
+        )
+        response.raise_for_status()
+        data = response.json()
+        if data.get("output_text"):
+            return data["output_text"].strip()
+        for item in data.get("output", []):
+            for content in item.get("content", []):
+                if content.get("type") == "output_text":
+                    return content.get("text", "").strip()
+        raise ValueError("OpenAI returned no text output")
 
     def _fallback_response(
         self, context: Dict[str, Any], language: str, reason: str
@@ -297,3 +364,14 @@ class AIOrchestrator:
             "safety_detail": f"Deterministic fallback: {reason}",
             "trends": context,
         }
+
+    def _fallback_briefing(self, context: Dict[str, Any], reason: str) -> Dict[str, Any]:
+        gf = context.get("glucose_fasting", {})
+        med = context.get("medication_adherence", {})
+        if gf.get("average") is not None:
+            text = f"Your verified fasting-glucose record shows a {gf.get('trend_direction', 'stable')} trend over the last {gf.get('days_requested', 7)} days. Keep logging your next routine record to build a clearer picture for discussion with your care team."
+        elif med.get("adherence_rate") is not None:
+            text = "Your medication-status records are available for review. Keep recording your next status so your self-care record remains clear."
+        else:
+            text = "There is not enough verified information for a trend explanation yet. Add your next routine record to start building a clearer self-care picture."
+        return {"response": text, "safety_status": "fallback", "safety_detail": f"Deterministic fallback: {reason}"}

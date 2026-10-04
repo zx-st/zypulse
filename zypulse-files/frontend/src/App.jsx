@@ -8,16 +8,18 @@ import HistoryPage from './pages/HistoryPage.jsx'
 import NotificationsPage from './pages/NotificationsPage.jsx'
 import SummaryPage from './pages/SummaryPage.jsx'
 import MealLogPage from './pages/MealLogPage.jsx'
+import DailyBriefingPage from './pages/DailyBriefingPage.jsx'
 import Header from './components/Header.jsx'
 import NavBar from './components/NavBar.jsx'
 
 const DEMO_USER = 'mr_tan_001'
 
 export default function App() {
-  const [page, setPage] = useState('chat')
+  const [page, setPage] = useState('daily')
   const [language, setLanguage] = useState('en')
 
   const pages = {
+    daily: <DailyBriefingPage userId={DEMO_USER} language={language} setPage={setPage} />,
     chat: <ChatPage userId={DEMO_USER} language={language} />,
     log: <LogPage userId={DEMO_USER} />,
     trends: <TrendsPage userId={DEMO_USER} />,

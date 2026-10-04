@@ -154,6 +154,17 @@ class ChatResponse(BaseModel):
     audit_id: Optional[int] = None
 
 
+class DailyBriefingRequest(BaseModel):
+    user_id: str = Field(..., min_length=1, max_length=100)
+    language: str = Field("en", pattern="^(en|zh|ms|ta)$")
+
+
+class DailyBriefingResponse(BaseModel):
+    analysis: str
+    safety_status: str
+    safety_detail: Optional[str] = None
+
+
 # ============================================================
 # PREFERENCES
 # ============================================================
