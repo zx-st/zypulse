@@ -1,5 +1,6 @@
 export default function NavBar({ page, setPage }) {
   const items = [
+    { key: 'daily', label: 'Today', icon: '☀️' },
     { key: 'chat', label: 'Coach', icon: '💬' },
     { key: 'log', label: 'Log', icon: '📝' },
     { key: 'meals', label: 'Meals', icon: '🍽️' },

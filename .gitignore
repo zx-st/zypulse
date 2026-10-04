@@ -3,9 +3,31 @@
 **/.venv/
 __pycache__/
 *.py[cod]
+*.egg-info/
+build/
+
+# Python tests and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local environment secrets
+.env
+.env.*
+!.env.example
 
 # Node and pnpm dependencies/cache
 node_modules/
 .pnpm-store/
 .vite/
 dist/
+
+# SQLite runtime database and sidecar files (recreated from seeded JSON data)
+zypulse-files/backend/zypulse.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# OS files
+.DS_Store
+Thumbs.db
