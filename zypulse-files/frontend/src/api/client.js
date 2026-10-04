@@ -25,6 +25,7 @@ export const api = {
 
   // Chat
   chat: (data) => request('/chat', { method: 'POST', body: data }),
+  getDailyBriefing: (data) => request('/daily-briefing', { method: 'POST', body: data }),
 
   // Trends
   getTrends: (params) => {

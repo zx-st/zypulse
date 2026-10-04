@@ -17,34 +17,39 @@ const badgeLabel = {
   below_target: 'Below target',
 }
 
-export default function DailyBriefingPage({ userId, setPage }) {
+export default function DailyBriefingPage({ userId, language, setPage }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
+  const [analysis, setAnalysis] = useState(null)
 
   useEffect(() => {
     const loadBriefing = async () => {
       try {
-        const [fasting, evening, medication, activity, meals] = await Promise.all([
+        const [fasting, evening, medication, activity, meals, preferences] = await Promise.all([
           api.getTrends({ user_id: userId, metric: 'glucose', period: 'fasting', days: 7 }),
           api.getTrends({ user_id: userId, metric: 'glucose', period: 'evening', days: 7 }),
           api.getTrends({ user_id: userId, metric: 'medication', days: 30 }),
           api.getTrends({ user_id: userId, metric: 'activity', days: 30 }),
           api.getHistory({ user_id: userId, category: 'meals', limit: 7 }),
+          api.getPreferences(userId),
         ])
-        setData({ fasting, evening, medication, activity, meals })
+        setData({ fasting, evening, medication, activity, meals, preferences })
+        const briefing = await api.getDailyBriefing({ user_id: userId, language })
+        setAnalysis(briefing)
       } catch (err) {
         setError('Unable to load your daily briefing. Please try again.')
       }
     }
     loadBriefing()
-  }, [userId])
+  }, [userId, language])
 
   if (error) return <div className="error-msg">{error}</div>
   if (!data) return <div className="loading">Preparing your daily briefing...</div>
 
-  const { fasting, evening, medication, activity, meals } = data
+  const { fasting, evening, medication, activity, meals, preferences } = data
   const action = chooseAction({ fasting, evening, medication, activity, meals })
   const signal = getRiskSignal({ fasting, evening, medication, activity, meals })
+  const missingProfileItems = getMissingHealthProfileItems(preferences)
 
   return (
     <div className="daily-briefing">
@@ -72,6 +77,19 @@ export default function DailyBriefingPage({ userId, setPage }) {
         <h2>{action.title}</h2>
         <p>{action.description}</p>
         <button className="btn btn-primary daily-action-button" onClick={() => setPage(action.page)}>{action.button}</button>
+      </section>
+
+      {missingProfileItems.length > 0 && (
+        <section className="daily-profile-reminder">
+          <div><strong>Make your briefing more personal</strong><p>Add: {missingProfileItems.join(', ')}.</p></div>
+          <button onClick={() => setPage('profile')}>Complete profile</button>
+        </section>
+      )}
+
+      <section className="daily-ai-card">
+        <div className="card-title">AI briefing</div>
+        <p>{analysis?.analysis || 'Preparing your data-based briefing...'}</p>
+        {analysis?.safety_status && analysis.safety_status !== 'allow' && <span className={`chat-safety-badge safety-${analysis.safety_status}`}>{analysis.safety_status === 'fallback' ? 'Deterministic mode' : 'Safety filtered'}</span>}
       </section>
 
       <section className="card">
@@ -109,6 +127,17 @@ function getRiskSignal({ fasting, evening, medication, activity, meals }) {
   if (needsAttention) return { tone: 'attention', label: 'Check in', headline: 'A few records need your attention', detail: 'This signal is based on what you logged, not a medical assessment.' }
   if (limitedData) return { tone: 'limited', label: 'Building', headline: 'More records will make this clearer', detail: 'Add your next routine record to strengthen your self-care picture.' }
   return { tone: 'steady', label: 'Steady', headline: 'Your recent record looks consistent', detail: 'Keep logging to maintain a clear picture for yourself and your care team.' }
+}
+
+function getMissingHealthProfileItems(preferences = {}) {
+  const fields = [
+    ['goals', 'a self-care goal'],
+    ['barriers', 'a routine barrier'],
+    ['activity_types', 'activity preferences'],
+    ['availability', 'available times'],
+    ['location_area', 'your general area'],
+  ]
+  return fields.filter(([key]) => !preferences[key] || (Array.isArray(preferences[key]) && preferences[key].length === 0)).map(([, label]) => label)
 }
 
 function BriefingTrend({ label, value, trend }) {

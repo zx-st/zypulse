@@ -8,6 +8,10 @@ const MR_TAN_DEFAULTS = {
   contact_email: '',
   contact_phone: '',
   language: 'en',
+  goals: '',
+  barriers: '',
+  activity_types: '',
+  availability: '',
   accessibility_json: { larger_text: false, reduced_motion: false, high_contrast: false },
 }
 
@@ -40,6 +44,10 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
         contact_email: prefs.contact_email || '',
         contact_phone: prefs.contact_phone || '',
         language: prefs.language || 'en',
+        goals: (prefs.goals || []).join('\n'),
+        barriers: (prefs.barriers || []).join('\n'),
+        activity_types: (prefs.activity_types || []).join(', '),
+        availability: (prefs.availability || []).join(', '),
         accessibility_json: prefs.accessibility_json || MR_TAN_DEFAULTS.accessibility_json,
       })
       setAccessibility(prefs.accessibility_json || MR_TAN_DEFAULTS.accessibility_json)
@@ -85,6 +93,10 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
         contact_email: form.contact_email || null,
         contact_phone: form.contact_phone || null,
         language: form.language,
+        goals: listFromText(form.goals),
+        barriers: listFromText(form.barriers),
+        activity_types: listFromText(form.activity_types),
+        availability: listFromText(form.availability),
         accessibility_json: accessibility,
       })
       setSaved(true)
@@ -179,6 +191,23 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
             </div>
 
             <div className="form-group">
+              <label className="form-label">My self-care goals</label>
+              <textarea className="form-textarea" value={form.goals} onChange={(e) => setForm({ ...form, goals: e.target.value })} placeholder="One goal per line, e.g. Walk regularly" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">What can make this harder?</label>
+              <textarea className="form-textarea" value={form.barriers} onChange={(e) => setForm({ ...form, barriers: e.target.value })} placeholder="One item per line, e.g. Busy work schedule" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Preferred activities</label>
+              <input className="form-input" value={form.activity_types} onChange={(e) => setForm({ ...form, activity_types: e.target.value })} placeholder="e.g. walking, parks" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Times that usually work for you</label>
+              <input className="form-input" value={form.availability} onChange={(e) => setForm({ ...form, availability: e.target.value })} placeholder="e.g. weekday evenings, weekend mornings" />
+            </div>
+
+            <div className="form-group">
               <label className="form-label">Accessibility / settings</label>
               <div className="toggle-row">
                 <span>Larger text</span>
@@ -239,4 +268,8 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
       </div>
     </div>
   )
+}
+
+function listFromText(value) {
+  return value.split(/[\n,]/).map(item => item.trim()).filter(Boolean)
 }

@@ -212,6 +212,12 @@ class SafetyEngine:
                     extract_numbers(item)
             elif isinstance(obj, (int, float)):
                 verified_numbers.add(round(float(obj), 1))
+            elif isinstance(obj, str):
+                # User-saved goals can contain explicit, non-clinical targets such as
+                # "walk 30 minutes at least 5 days a week". Allow the model to repeat
+                # those exact values, while all other generated health numbers remain blocked.
+                for number in re.findall(r'\b\d+(?:\.\d+)?\b', obj):
+                    verified_numbers.add(round(float(number), 1))
 
         extract_numbers(context)
 

@@ -19,7 +19,7 @@ export default function App() {
   const [language, setLanguage] = useState('en')
 
   const pages = {
-    daily: <DailyBriefingPage userId={DEMO_USER} setPage={setPage} />,
+    daily: <DailyBriefingPage userId={DEMO_USER} language={language} setPage={setPage} />,
     chat: <ChatPage userId={DEMO_USER} language={language} />,
     log: <LogPage userId={DEMO_USER} />,
     trends: <TrendsPage userId={DEMO_USER} />,

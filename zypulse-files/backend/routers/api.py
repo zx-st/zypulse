@@ -19,7 +19,7 @@ from typing import Optional
 
 from ..models.schemas import (
     GlucoseLogRequest, MedicationLogRequest, ActivityLogRequest,
-    ChatRequest, ChatResponse,
+    ChatRequest, ChatResponse, DailyBriefingRequest, DailyBriefingResponse,
     TrendRequest, TrendResponse,
     PreferencesUpdate, PreferencesResponse,
     NoteCreateRequest, NoteUpdateRequest, NoteResponse,
@@ -38,6 +38,17 @@ safety_engine = SafetyEngine()
 db = get_db()
 calc_engine = CalculationEngine(db)
 ai_orchestrator = AIOrchestrator(safety_engine)
+
+
+def _with_user_context(summary: dict, user_id: str) -> dict:
+    """Attach only user-saved preferences that can make AI language relevant."""
+    preferences = db.get_preferences(user_id) or {}
+    summary["user_context"] = {
+        key: preferences.get(key)
+        for key in ("display_name", "location_area", "goals", "barriers", "activity_types", "availability")
+        if preferences.get(key)
+    }
+    return summary
 
 
 # ============================================================
@@ -150,7 +161,7 @@ async def chat(req: ChatRequest):
         )
 
     # STEP 2: C3 Calculation Engine - compute deterministic trends
-    context = calc_engine.get_full_summary(req.user_id, days=7)
+    context = _with_user_context(calc_engine.get_full_summary(req.user_id, days=7), req.user_id)
 
     # STEP 3: Get conversation history for continuity
     history = db.get_conversation_history(req.user_id, limit=6)
@@ -189,6 +200,21 @@ async def chat(req: ChatRequest):
         safety_detail=result["safety_detail"],
         trends=context if result["safety_status"] != "blocked" else None,
         audit_id=audit_id,
+    )
+
+
+@router.post("/daily-briefing", response_model=DailyBriefingResponse)
+async def daily_briefing(req: DailyBriefingRequest):
+    """Generate a safety-screened explanation of verified daily briefing data."""
+    context = _with_user_context(calc_engine.get_full_summary(req.user_id, days=7), req.user_id)
+    result = ai_orchestrator.generate_briefing(context, req.language)
+    db.add_audit_event(
+        "daily_briefing_output_check", result["safety_status"], result["safety_detail"], req.user_id
+    )
+    return DailyBriefingResponse(
+        analysis=result["response"],
+        safety_status=result["safety_status"],
+        safety_detail=result["safety_detail"],
     )
 
 
