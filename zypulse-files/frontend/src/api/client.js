@@ -28,6 +28,7 @@ export const api = {
   // Chat
   chat: (data) => request('/chat', { method: 'POST', body: data }),
   getDailyBriefing: (data) => request('/daily-briefing', { method: 'POST', body: data }),
+  getAiUsage: (userId) => request(`/ai-usage?user_id=${encodeURIComponent(userId)}`),
 
   // Trends
   getTrends: (params) => {
