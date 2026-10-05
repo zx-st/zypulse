@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client.js'
+import { translateText } from '../i18n.jsx'
 
-export default function TrendsPage({ userId }) {
+export default function TrendsPage({ userId, language }) {
+  const t = (text) => translateText(language, text)
   const [glucoseFasting, setGlucoseFasting] = useState(null)
   const [glucoseEvening, setGlucoseEvening] = useState(null)
   const [medication, setMedication] = useState(null)
@@ -56,35 +58,35 @@ export default function TrendsPage({ userId }) {
     return map[direction] || direction
   }
 
-  if (loading) return <div className="loading">Loading your trends...</div>
+  if (loading) return <div className="loading">{t('Loading your trends...')}</div>
   if (error) return <div className="error-msg">{error}</div>
 
   return (
     <div>
       <div className="card">
-        <div className="card-title">🩸 Glucose Trends (7 days)</div>
+        <div className="card-title">🩸 {t('Glucose Trends (7 days)')}</div>
 
         {glucoseFasting && !glucoseFasting.insufficient_data && (
           <>
             <div className="trend-row">
-              <span className="trend-label">Fasting average</span>
+              <span className="trend-label">{t('Fasting average')}</span>
               <span className="trend-value">{glucoseFasting.average} mmol/L</span>
             </div>
             <div className="trend-row">
-              <span className="trend-label">Fasting range</span>
+              <span className="trend-label">{t('Fasting range')}</span>
               <span className="trend-value">{glucoseFasting.min_value} – {glucoseFasting.max_value}</span>
             </div>
             <div className="trend-row">
-              <span className="trend-label">Fasting trend</span>
+              <span className="trend-label">{t('Fasting trend')}</span>
               <span className="trend-value">
                 <span className={`trend-badge ${trendBadgeClass(glucoseFasting.trend_direction)}`}>
-                  {trendLabel(glucoseFasting.trend_direction)}
+                  {t(trendLabel(glucoseFasting.trend_direction))}
                 </span>
                 {glucoseFasting.trend_pct !== null && ` (${glucoseFasting.trend_pct > 0 ? '+' : ''}${glucoseFasting.trend_pct}%)`}
               </span>
             </div>
             <div className="trend-row">
-              <span className="trend-label">Readings</span>
+              <span className="trend-label">{t('Readings')}</span>
               <span className="trend-value">{glucoseFasting.readings_count}</span>
             </div>
           </>
@@ -99,18 +101,18 @@ export default function TrendsPage({ userId }) {
         {glucoseEvening && !glucoseEvening.insufficient_data && (
           <>
             <div className="trend-row">
-              <span className="trend-label">Evening average</span>
+              <span className="trend-label">{t('Evening average')}</span>
               <span className="trend-value">{glucoseEvening.average} mmol/L</span>
             </div>
             <div className="trend-row">
-              <span className="trend-label">Evening range</span>
+              <span className="trend-label">{t('Evening range')}</span>
               <span className="trend-value">{glucoseEvening.min_value} – {glucoseEvening.max_value}</span>
             </div>
             <div className="trend-row">
-              <span className="trend-label">Evening trend</span>
+              <span className="trend-label">{t('Evening trend')}</span>
               <span className="trend-value">
                 <span className={`trend-badge ${trendBadgeClass(glucoseEvening.trend_direction)}`}>
-                  {trendLabel(glucoseEvening.trend_direction)}
+                  {t(trendLabel(glucoseEvening.trend_direction))}
                 </span>
               </span>
             </div>
@@ -127,11 +129,11 @@ export default function TrendsPage({ userId }) {
       </div>
 
       <div className="card">
-        <div className="card-title">💊 Medication Adherence (30 days)</div>
+        <div className="card-title">💊 {t('Medication Adherence (30 days)')}</div>
         {medication && !medication.insufficient_data && (
           <>
             <div className="trend-row">
-              <span className="trend-label">Adherence rate</span>
+              <span className="trend-label">{t('Adherence rate')}</span>
               <span className="trend-value">
                 <span className={`trend-badge ${trendBadgeClass(medication.trend_direction)}`}>
                   {medication.adherence_rate}%
@@ -139,11 +141,11 @@ export default function TrendsPage({ userId }) {
               </span>
             </div>
             <div className="trend-row">
-              <span className="trend-label">Doses taken</span>
+              <span className="trend-label">{t('Doses taken')}</span>
               <span className="trend-value">{medication.taken_doses} / {medication.expected_doses}</span>
             </div>
             <div className="trend-row">
-              <span className="trend-label">Missed doses</span>
+              <span className="trend-label">{t('Missed doses')}</span>
               <span className="trend-value">{medication.missed_doses}</span>
             </div>
             <div style={{ marginTop: 8, fontSize: '0.85rem', color: 'var(--gray-dark)' }}>{medication.notes}</div>
@@ -155,19 +157,19 @@ export default function TrendsPage({ userId }) {
       </div>
 
       <div className="card">
-        <div className="card-title">🏃 Activity Summary (30 days)</div>
+        <div className="card-title">🏃 {t('Activity Summary (30 days)')}</div>
         {activity && !activity.insufficient_data && (
           <>
             <div className="trend-row">
-              <span className="trend-label">Active days</span>
+              <span className="trend-label">{t('Active days')}</span>
               <span className="trend-value">{activity.activity_days} / 30</span>
             </div>
             <div className="trend-row">
-              <span className="trend-label">Total duration</span>
+              <span className="trend-label">{t('Total duration')}</span>
               <span className="trend-value">{activity.total_duration_min} min</span>
             </div>
             <div className="trend-row">
-              <span className="trend-label">Average per session</span>
+              <span className="trend-label">{t('Average per session')}</span>
               <span className="trend-value">{activity.avg_duration_min} min</span>
             </div>
             <div style={{ marginTop: 8, fontSize: '0.85rem', color: 'var(--gray-dark)' }}>{activity.notes}</div>
@@ -179,7 +181,7 @@ export default function TrendsPage({ userId }) {
       </div>
 
       <button className="btn btn-secondary" onClick={loadTrends} style={{ marginBottom: 20 }}>
-        Refresh Trends
+        {t('Refresh Trends')}
       </button>
     </div>
   )

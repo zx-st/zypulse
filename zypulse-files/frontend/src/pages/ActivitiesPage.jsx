@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client.js'
+import { translateText } from '../i18n.jsx'
 
-export default function ActivitiesPage({ userId }) {
+export default function ActivitiesPage({ userId, language }) {
+  const t = (text) => translateText(language, text)
   const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -59,30 +61,25 @@ export default function ActivitiesPage({ userId }) {
     return map[status] || status
   }
 
-  if (loading) return <div className="loading">Loading activities...</div>
+  if (loading) return <div className="loading">{t('Loading activities...')}</div>
   if (error) return <div className="error-msg">{error}</div>
 
   return (
     <div>
       <div className="card">
-        <div className="card-title">🤝 Community Activities</div>
+        <div className="card-title">🤝 {t('Community Activities')}</div>
         <div style={{ fontSize: '0.85rem', color: 'var(--gray)', marginBottom: 12 }}>
-          Find health activities near you. All activities are from a demo catalogue.
+          {t('Find health activities near you. All activities are from a demo catalogue.')}
         </div>
 
         <div className="form-group">
-          <label className="form-label">Filter by type</label>
+          <label className="form-label">{t('Filter by type')}</label>
           <select className="form-select" value={filterType} onChange={e => setFilterType(e.target.value)}>
-            <option value="">All types</option>
-            <option value="walking">Walking</option>
-            <option value="exercise">Exercise</option>
-            <option value="education">Education</option>
-            <option value="mindfulness">Mindfulness</option>
-            <option value="support">Support</option>
+            <option value="">{t('All types')}</option><option value="walking">{t('Walking')}</option><option value="exercise">{t('Exercise')}</option><option value="education">{t('Education')}</option><option value="mindfulness">{t('Mindfulness')}</option><option value="support">{t('Support')}</option>
           </select>
         </div>
         <button className="btn btn-secondary" onClick={loadActivities} style={{ marginBottom: 12 }}>
-          Search
+          {t('Search')}
         </button>
       </div>
 
@@ -93,7 +90,7 @@ export default function ActivitiesPage({ userId }) {
       {activities.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">🔍</div>
-          No activities found. Try a different filter.
+          {t('No activities found. Try a different filter.')}
         </div>
       ) : (
         activities.map(activity => (
@@ -108,15 +105,15 @@ export default function ActivitiesPage({ userId }) {
             <div className="activity-desc">{activity.description}</div>
             <div style={{ marginBottom: 8 }}>
               <span className={`activity-badge ${statusBadge(activity.registration_status)}`}>
-                {statusLabel(activity.registration_status)}
+                {t(statusLabel(activity.registration_status))}
               </span>
               {activity.accessibility === 'wheelchair_accessible' && (
-                <span className="activity-badge badge-open">♿ Accessible</span>
+                <span className="activity-badge badge-open">♿ {t('Accessible')}</span>
               )}
             </div>
             {activity.registration_status !== 'closed' && (
               <button className="btn btn-primary" onClick={() => handleRegister(activity)}>
-                Register (Simulated)
+                {t('Register (Simulated)')}
               </button>
             )}
           </div>

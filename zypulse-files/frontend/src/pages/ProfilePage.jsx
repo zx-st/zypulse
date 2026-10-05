@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client.js'
+import { LANGUAGES, useTranslation } from '../i18n.jsx'
 
 // Fictional Mr Tan prototype defaults (no NRIC, no Singpass, no full address)
 const MR_TAN_DEFAULTS = {
@@ -15,14 +16,8 @@ const MR_TAN_DEFAULTS = {
   accessibility_json: { larger_text: false, reduced_motion: false, high_contrast: false },
 }
 
-const LANGUAGES = [
-  { code: 'en', label: 'English' },
-  { code: 'zh', label: '中文' },
-  { code: 'ms', label: 'Bahasa Melayu' },
-  { code: 'ta', label: 'தமிழ்' },
-]
-
 export default function ProfilePage({ userId, language, setLanguage, setPage }) {
+  const t = useTranslation(language)
   const [form, setForm] = useState({ ...MR_TAN_DEFAULTS })
   const [accessibility, setAccessibility] = useState(MR_TAN_DEFAULTS.accessibility_json)
   const [loaded, setLoaded] = useState(false)
@@ -113,12 +108,12 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
   if (signedOut) {
     return (
       <div className="card">
-        <div className="card-title">👋 Signed out (prototype)</div>
+        <div className="card-title">👋 {t('signedOut')}</div>
         <p style={{ fontSize: '0.9rem', color: 'var(--gray-dark)', marginBottom: 12 }}>
-          This is a self-care prototype. No account data leaves your device in this demo.
+          {t('profileSafety')}
         </p>
         <button className="btn btn-primary" onClick={() => setSignedOut(false)}>
-          Return to Profile
+          {t('returnProfile')}
         </button>
       </div>
     )
@@ -127,11 +122,11 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
   return (
     <div>
       <div className="card">
-        <div className="card-title">👤 Profile</div>
+        <div className="card-title">👤 {t('profileTitle')}</div>
         <div className={contentClass}>
           <form onSubmit={handleSave}>
             <div className="form-group">
-              <label className="form-label">Preferred / display name</label>
+              <label className="form-label">{t('displayName')}</label>
               <input
                 className="form-input"
                 type="text"
@@ -142,7 +137,7 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
             </div>
 
             <div className="form-group">
-              <label className="form-label">General location</label>
+              <label className="form-label">{t('location')}</label>
               <input
                 className="form-input"
                 type="text"
@@ -153,7 +148,7 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
             </div>
 
             <div className="form-group">
-              <label className="form-label">Contact email (optional)</label>
+              <label className="form-label">{t('email')}</label>
               <input
                 className="form-input"
                 type="email"
@@ -164,7 +159,7 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
             </div>
 
             <div className="form-group">
-              <label className="form-label">Contact phone (optional)</label>
+              <label className="form-label">{t('phone')}</label>
               <input
                 className="form-input"
                 type="tel"
@@ -175,7 +170,7 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
             </div>
 
             <div className="form-group">
-              <label className="form-label">Preferred language</label>
+              <label className="form-label">{t('preferredLanguage')}</label>
               <select
                 className="form-select"
                 value={form.language}
@@ -186,71 +181,71 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
                 ))}
               </select>
               <div style={{ fontSize: '0.75rem', color: 'var(--gray)', marginTop: 4 }}>
-                You can also switch language any time from the top-right shortcut.
+                {t('languageHelp')}
               </div>
             </div>
 
             <div className="form-group">
-              <label className="form-label">My self-care goals</label>
+              <label className="form-label">{t('goals')}</label>
               <textarea className="form-textarea" value={form.goals} onChange={(e) => setForm({ ...form, goals: e.target.value })} placeholder="One goal per line, e.g. Walk regularly" />
             </div>
             <div className="form-group">
-              <label className="form-label">What can make this harder?</label>
+              <label className="form-label">{t('barriers')}</label>
               <textarea className="form-textarea" value={form.barriers} onChange={(e) => setForm({ ...form, barriers: e.target.value })} placeholder="One item per line, e.g. Busy work schedule" />
             </div>
             <div className="form-group">
-              <label className="form-label">Preferred activities</label>
+              <label className="form-label">{t('activities')}</label>
               <input className="form-input" value={form.activity_types} onChange={(e) => setForm({ ...form, activity_types: e.target.value })} placeholder="e.g. walking, parks" />
             </div>
             <div className="form-group">
-              <label className="form-label">Times that usually work for you</label>
+              <label className="form-label">{t('availability')}</label>
               <input className="form-input" value={form.availability} onChange={(e) => setForm({ ...form, availability: e.target.value })} placeholder="e.g. weekday evenings, weekend mornings" />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Accessibility / settings</label>
+              <label className="form-label">{t('accessibility')}</label>
               <div className="toggle-row">
-                <span>Larger text</span>
+                <span>{t('largerText')}</span>
                 <button type="button" className={`toggle ${accessibility.larger_text ? 'on' : ''}`} onClick={() => handleAccessibility('larger_text')}>
-                  {accessibility.larger_text ? 'On' : 'Off'}
+                  {accessibility.larger_text ? t('on') : t('off')}
                 </button>
               </div>
               <div className="toggle-row">
-                <span>Reduced motion</span>
+                <span>{t('reducedMotion')}</span>
                 <button type="button" className={`toggle ${accessibility.reduced_motion ? 'on' : ''}`} onClick={() => handleAccessibility('reduced_motion')}>
-                  {accessibility.reduced_motion ? 'On' : 'Off'}
+                  {accessibility.reduced_motion ? t('on') : t('off')}
                 </button>
               </div>
               <div className="toggle-row">
-                <span>High contrast</span>
+                <span>{t('highContrast')}</span>
                 <button type="button" className={`toggle ${accessibility.high_contrast ? 'on' : ''}`} onClick={() => handleAccessibility('high_contrast')}>
-                  {accessibility.high_contrast ? 'On' : 'Off'}
+                  {accessibility.high_contrast ? t('on') : t('off')}
                 </button>
               </div>
             </div>
 
-            {saved && <div className="success-msg">Profile saved.</div>}
+            {saved && <div className="success-msg">{t('profileSaved')}</div>}
             {error && <div className="error-msg">{error}</div>}
 
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Saving...' : 'Save Profile'}
+              {saving ? t('saving') : t('saveProfile')}
             </button>
           </form>
         </div>
       </div>
 
       <div className="card">
-        <div className="card-title">🔗 Quick links</div>
+        <div className="card-title">🔗 {t('quickLinks')}</div>
         <button className="btn btn-secondary" style={{ marginBottom: 8 }} onClick={() => setPage('notifications')}>
-          🔔 Notifications &amp; reminders
+          🔔 {t('reminders')}
         </button>
         <button className="btn btn-secondary" onClick={() => setPage('summary')}>
-          🩺 Health Summary &amp; Notes for Doctor
+          🩺 {t('healthSummary')}
         </button>
       </div>
 
       <div className="card">
-        <div className="card-title">❓ Help</div>
+        <div className="card-title">❓ {t('help')}</div>
         <div style={{ fontSize: '0.85rem', color: 'var(--gray-dark)', lineHeight: 1.7 }}>
           <p><strong>Is this a medical device?</strong> No. ZyPulse is a self-care support prototype. Always consult your doctor for medical advice.</p>
           <p><strong>Where is my data?</strong> All data shown is synthetic demo data for Mr Tan. Nothing is sent to HPB or Healthy 365.</p>
@@ -260,10 +255,10 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
 
       <div className="card">
         <button className="btn btn-danger" onClick={() => setSignedOut(true)}>
-          Sign out
+          {t('signOut')}
         </button>
         <div style={{ fontSize: '0.75rem', color: 'var(--gray)', marginTop: 6, textAlign: 'center' }}>
-          Prototype only - no account is actually closed.
+          {t('signOutNote')}
         </div>
       </div>
     </div>
