@@ -8,7 +8,7 @@ export default function LogPage({ userId, language }) {
   const [success, setSuccess] = useState(null)
   const [error, setError] = useState(null)
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Singapore' }).format(new Date())
 
   // Glucose form state
   const [glucoseValue, setGlucoseValue] = useState('')

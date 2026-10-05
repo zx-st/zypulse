@@ -36,6 +36,8 @@ export const api = {
   // Preferences
   getPreferences: (userId) => request(`/preferences?user_id=${userId}`),
   updatePreferences: (userId, data) => request(`/preferences?user_id=${userId}`, { method: 'PUT', body: data }),
+  getNotifications: (userId) => request(`/notifications?user_id=${userId}`),
+  markNotificationRead: (notificationId, userId) => request(`/notifications/${notificationId}/read?user_id=${userId}`, { method: 'PUT' }),
 
   // History (unified chronological view)
   getHistory: (params) => {

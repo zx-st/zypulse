@@ -6,6 +6,7 @@ All inputs validated server-side; no untrusted data reaches the DB or LLM.
 from pydantic import BaseModel, Field, validator
 from typing import Optional, List, Dict, Any
 from datetime import date
+from ..time_utils import today_sg_iso
 
 
 # ============================================================
@@ -73,7 +74,7 @@ class MealLogRequest(BaseModel):
     @validator("recorded_date", always=True)
     def default_date(cls, v):
         if v is None:
-            return date.today().isoformat()
+            return today_sg_iso()
         try:
             date.fromisoformat(v)
         except ValueError:

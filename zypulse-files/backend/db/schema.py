@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS health_records (
     notes          TEXT,
     source         TEXT DEFAULT 'user_entry',  -- 'user_entry' or 'DEMO/SYNTHETIC'
     include_in_visit_summary INTEGER NOT NULL DEFAULT 0,  -- 1 if user flagged note for doctor visit summary
-    created_at     TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_health_user_date ON health_records(user_id, recorded_date);
@@ -59,8 +59,8 @@ CREATE TABLE IF NOT EXISTS user_preferences (
     medications     TEXT,                -- JSON array as string
     targets         TEXT,                -- JSON object as string
     source          TEXT DEFAULT 'user_entry',
-    created_at      TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
-    updated_at      TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
 -- ============================================================
@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS ai_memory (
     timestamp      TEXT NOT NULL,
     safety_flag    TEXT DEFAULT 'none',  -- none, blocked_input, blocked_output, warning
     source         TEXT DEFAULT 'ai_generated',
-    created_at     TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_memory_user ON ai_memory(user_id);
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS registration_info (
     registered_at   TEXT,
     confirmation_id TEXT,                        -- mock confirmation ID
     source          TEXT DEFAULT 'DEMO/SYNTHETIC',
-    created_at      TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_reg_user ON registration_info(user_id);
@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS sharing_approved (
     approved        INTEGER NOT NULL DEFAULT 0,
     approved_at     TEXT,
     source          TEXT DEFAULT 'DEMO/SYNTHETIC',
-    created_at      TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_share_user ON sharing_approved(user_id);
@@ -127,8 +127,23 @@ CREATE TABLE IF NOT EXISTS audit_log (
     event_type      TEXT NOT NULL,   -- safety_input_check, safety_output_check, llm_call, consent_step, fallback_triggered
     decision        TEXT,            -- allow, block, flag
     detail          TEXT,
-    timestamp       TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    timestamp       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
+
+-- In-app notification outbox. Reminder times are always Asia/Singapore time.
+CREATE TABLE IF NOT EXISTS notifications (
+    notification_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         TEXT NOT NULL,
+    reminder_key    TEXT NOT NULL,
+    title           TEXT NOT NULL,
+    body            TEXT NOT NULL,
+    due_at          TEXT NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'delivered' CHECK(status IN ('delivered', 'read', 'overdue')),
+    created_at      TEXT NOT NULL,
+    read_at         TEXT,
+    UNIQUE(user_id, reminder_key, due_at)
+);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, due_at DESC);
 """
 
 

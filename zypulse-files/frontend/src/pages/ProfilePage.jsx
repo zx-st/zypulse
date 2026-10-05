@@ -13,10 +13,10 @@ const MR_TAN_DEFAULTS = {
   barriers: '',
   activity_types: '',
   availability: '',
-  accessibility_json: { larger_text: false, reduced_motion: false, high_contrast: false },
+  accessibility_json: { larger_text: false },
 }
 
-export default function ProfilePage({ userId, language, setLanguage, setPage }) {
+export default function ProfilePage({ userId, language, setLanguage, setPage, setLargerText }) {
   const t = useTranslation(language)
   const [form, setForm] = useState({ ...MR_TAN_DEFAULTS })
   const [accessibility, setAccessibility] = useState(MR_TAN_DEFAULTS.accessibility_json)
@@ -45,11 +45,14 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
         availability: (prefs.availability || []).join(', '),
         accessibility_json: prefs.accessibility_json || MR_TAN_DEFAULTS.accessibility_json,
       })
-      setAccessibility(prefs.accessibility_json || MR_TAN_DEFAULTS.accessibility_json)
+      const savedAccessibility = { larger_text: Boolean(prefs.accessibility_json?.larger_text) }
+      setAccessibility(savedAccessibility)
+      setLargerText(savedAccessibility.larger_text)
     } catch (err) {
       // Use fictional defaults if no preferences stored yet
       setForm({ ...MR_TAN_DEFAULTS })
       setAccessibility(MR_TAN_DEFAULTS.accessibility_json)
+      setLargerText(false)
     } finally {
       setLoaded(true)
     }
@@ -68,6 +71,7 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
   const handleAccessibility = async (key) => {
     const next = { ...accessibility, [key]: !accessibility[key] }
     setAccessibility(next)
+    if (key === 'larger_text') setLargerText(next.larger_text)
     setForm((f) => ({ ...f, accessibility_json: next }))
     try {
       await api.updatePreferences(userId, { accessibility_json: next })
@@ -102,9 +106,6 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
     }
   }
 
-  // Apply larger-text accessibility locally within this page only (no global redesign)
-  const contentClass = `profile-content${accessibility.larger_text ? ' a11y-large' : ''}`
-
   if (signedOut) {
     return (
       <div className="card">
@@ -123,7 +124,7 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
     <div>
       <div className="card">
         <div className="card-title">👤 {t('profileTitle')}</div>
-        <div className={contentClass}>
+        <div className="profile-content">
           <form onSubmit={handleSave}>
             <div className="form-group">
               <label className="form-label">{t('displayName')}</label>
@@ -208,18 +209,6 @@ export default function ProfilePage({ userId, language, setLanguage, setPage }) 
                 <span>{t('largerText')}</span>
                 <button type="button" className={`toggle ${accessibility.larger_text ? 'on' : ''}`} onClick={() => handleAccessibility('larger_text')}>
                   {accessibility.larger_text ? t('on') : t('off')}
-                </button>
-              </div>
-              <div className="toggle-row">
-                <span>{t('reducedMotion')}</span>
-                <button type="button" className={`toggle ${accessibility.reduced_motion ? 'on' : ''}`} onClick={() => handleAccessibility('reduced_motion')}>
-                  {accessibility.reduced_motion ? t('on') : t('off')}
-                </button>
-              </div>
-              <div className="toggle-row">
-                <span>{t('highContrast')}</span>
-                <button type="button" className={`toggle ${accessibility.high_contrast ? 'on' : ''}`} onClick={() => handleAccessibility('high_contrast')}>
-                  {accessibility.high_contrast ? t('on') : t('off')}
                 </button>
               </div>
             </div>
