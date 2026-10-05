@@ -53,22 +53,31 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS - allow frontend (Vite dev server on localhost:5173)
+# CORS - local origins by default; add deployed frontend URLs with the
+# comma-separated FRONTEND_ORIGINS environment variable on Render.
+frontend_origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+]
+frontend_origins.extend(
+    origin.strip()
+    for origin in os.environ.get("FRONTEND_ORIGINS", "").split(",")
+    if origin.strip()
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=frontend_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Mount API router
-app.include_router(api_router, prefix="")
+# The API router already owns the /api prefix. Mounting it without another
+# prefix prevents deployed routes from becoming /api/api/... .
+app.include_router(api_router)
 
 
 @app.on_event("startup")

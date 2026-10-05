@@ -1,4 +1,6 @@
-const API_BASE = '/api';
+// In development, Vite proxies /api to FastAPI. In production, set
+// VITE_API_BASE_URL to the deployed backend URL, including its /api prefix.
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 async function request(path, options = {}) {
   const url = `${API_BASE}${path}`;
