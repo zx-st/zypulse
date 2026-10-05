@@ -51,7 +51,7 @@ export default function MealLogPage({ userId, language }) {
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Singapore' }).format(new Date())
 
   useEffect(() => { loadRecent(); loadMeals() }, [userId])
 

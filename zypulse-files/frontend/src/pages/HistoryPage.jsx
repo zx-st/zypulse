@@ -44,6 +44,17 @@ function describe(record, t) {
   return { icon: '•', title: type, detail: '', sub: '' }
 }
 
+function formatWhen(iso, fallbackDate) {
+  if (!iso) return fallbackDate
+  const then = new Date(iso)
+  if (Number.isNaN(then.getTime())) return fallbackDate
+  const minutes = Math.round((Date.now() - then.getTime()) / 60000)
+  if (minutes >= 0 && minutes < 1) return 'Just now'
+  if (minutes >= 1 && minutes < 60) return `${minutes} min ago`
+  if (minutes >= 60 && minutes < 1440) return `${Math.floor(minutes / 60)}h ago`
+  return new Intl.DateTimeFormat(undefined, { timeZone: 'Asia/Singapore', dateStyle: 'medium', timeStyle: 'short' }).format(then)
+}
+
 export default function HistoryPage({ userId, language }) {
   const t = (text) => translateText(language, text)
   const [category, setCategory] = useState('all')
@@ -104,7 +115,7 @@ export default function HistoryPage({ userId, language }) {
                 <div className="history-detail">{d.detail}</div>
                 {d.sub && <div className="history-sub">{d.sub}</div>}
               </div>
-              <div className="history-date">{r.recorded_date}</div>
+              <div className="history-date" title={r.recorded_at}>{formatWhen(r.recorded_at, r.recorded_date)}</div>
             </div>
           )
         })

@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 from .schema import get_connection
+from ..time_utils import now_utc_iso
 
 
 class DataAccess:
@@ -40,7 +41,7 @@ class DataAccess:
     ) -> int:
         """Insert a single health record."""
         if recorded_at is None:
-            recorded_at = datetime.now().isoformat()
+            recorded_at = now_utc_iso()
 
         valid_types = [
             "glucose_fasting", "glucose_evening",
@@ -235,10 +236,10 @@ class DataAccess:
             UPDATE health_records
             SET value_text = ?, value_numeric = ?, notes = ?,
                 include_in_visit_summary = ?,
-                created_at = datetime('now', 'localtime')
+                created_at = ?
             WHERE record_id = ?
             """,
-            (value_text, total_carbs, notes, 1 if include_in_visit else 0, record_id),
+            (value_text, total_carbs, notes, 1 if include_in_visit else 0, now_utc_iso(), record_id),
         )
         conn.commit()
         conn.close()
@@ -314,7 +315,8 @@ class DataAccess:
                     set_clauses.append(f"{key} = ?")
                     params.append(val)
             if set_clauses:
-                set_clauses.append("updated_at = datetime('now', 'localtime')")
+                set_clauses.append("updated_at = ?")
+                params.append(now_utc_iso())
                 params.append(user_id)
                 conn.execute(
                     f"UPDATE user_preferences SET {', '.join(set_clauses)} WHERE user_id = ?",
@@ -362,7 +364,7 @@ class DataAccess:
         safety_flag: str = "none",
     ) -> int:
         if timestamp is None:
-            timestamp = datetime.now().isoformat()
+            timestamp = now_utc_iso()
         conn = self._conn()
         cursor = conn.execute(
             """
@@ -429,10 +431,10 @@ class DataAccess:
             """
             UPDATE registration_info
             SET consent_given = ?, consent_steps_completed = ?,
-                confirmation_id = ?, registered_at = datetime('now', 'localtime')
+                confirmation_id = ?, registered_at = ?
             WHERE reg_id = ?
             """,
-            (consent_given, json.dumps(consent_steps_completed), confirmation_id, reg_id),
+            (consent_given, json.dumps(consent_steps_completed), confirmation_id, now_utc_iso(), reg_id),
         )
         conn.commit()
         conn.close()
@@ -454,7 +456,7 @@ class DataAccess:
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (user_id, reg_id, field_name, field_value, field_category,
-             1 if approved else 0, datetime.now().isoformat() if approved else None),
+             1 if approved else 0, now_utc_iso() if approved else None),
         )
         share_id = cursor.lastrowid
         conn.commit()
@@ -472,15 +474,57 @@ class DataAccess:
         conn = self._conn()
         cursor = conn.execute(
             """
-            INSERT INTO audit_log (user_id, event_type, decision, detail)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO audit_log (user_id, event_type, decision, detail, timestamp)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (user_id, event_type, decision, detail),
+            (user_id, event_type, decision, detail, now_utc_iso()),
         )
         audit_id = cursor.lastrowid
         conn.commit()
         conn.close()
         return audit_id
+
+    # ================================================================
+    # NOTIFICATIONS (in-app delivery outbox)
+    # ================================================================
+
+    def get_all_reminder_preferences(self) -> List[Dict[str, Any]]:
+        conn = self._conn()
+        rows = conn.execute(
+            "SELECT user_id, reminder_settings FROM user_preferences WHERE reminder_settings IS NOT NULL"
+        ).fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    def create_notification(self, user_id: str, reminder_key: str, title: str, body: str, due_at: str, status: str = "delivered") -> bool:
+        conn = self._conn()
+        cursor = conn.execute(
+            """INSERT OR IGNORE INTO notifications
+               (user_id, reminder_key, title, body, due_at, status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (user_id, reminder_key, title, body, due_at, status, now_utc_iso()),
+        )
+        conn.commit()
+        conn.close()
+        return cursor.rowcount > 0
+
+    def get_notifications(self, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        conn = self._conn()
+        rows = conn.execute(
+            "SELECT * FROM notifications WHERE user_id = ? ORDER BY due_at DESC LIMIT ?", (user_id, limit)
+        ).fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    def mark_notification_read(self, notification_id: int, user_id: str) -> bool:
+        conn = self._conn()
+        cursor = conn.execute(
+            "UPDATE notifications SET status = 'read', read_at = ? WHERE notification_id = ? AND user_id = ?",
+            (now_utc_iso(), notification_id, user_id),
+        )
+        conn.commit()
+        conn.close()
+        return cursor.rowcount > 0
 
 
 # Module-level instance for convenience

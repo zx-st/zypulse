@@ -13,9 +13,9 @@ Central orchestration hub:
 Run: uvicorn backend.main:app --reload --port 8000
 """
 
+import asyncio
 import os
 import sys
-from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -29,6 +29,21 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 from .routers.api import router as api_router
 from .db.schema import init_db, DB_PATH
 from .db.seed import seed_all
+from .services.reminders import dispatch_due_reminders
+from .time_utils import now_utc_iso
+
+_reminder_task = None
+
+
+async def _reminder_loop():
+    """Run the persistent in-app reminder dispatcher once a minute."""
+    from .db.data_access import get_db
+    while True:
+        try:
+            dispatch_due_reminders(get_db(DB_PATH))
+        except Exception as exc:
+            print(f"[ZyPulse] reminder dispatcher error: {exc}")
+        await asyncio.sleep(60)
 
 app = FastAPI(
     title="ZyPulse API",
@@ -71,6 +86,14 @@ async def startup_event():
         seed_all(DB_PATH)
     else:
         print("[ZyPulse] Database already has data - skipping seed.")
+    global _reminder_task
+    _reminder_task = asyncio.create_task(_reminder_loop())
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    if _reminder_task:
+        _reminder_task.cancel()
 
 
 @app.get("/")
@@ -89,7 +112,7 @@ async def root():
 @app.get("/health")
 async def health():
     """Health check."""
-    return {"status": "ok", "timestamp": datetime.now().isoformat()}
+    return {"status": "ok", "timestamp": now_utc_iso(), "timezone": "Asia/Singapore"}
 
 
 if __name__ == "__main__":

@@ -40,6 +40,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* The Profile preference changes the root size, so rem-based text grows app-wide. */
+html.a11y-large-text { font-size: 112.5%; }
+
 #root {
   min-height: 100vh;
   display: flex;
@@ -409,10 +412,7 @@ body {
 }
 
 /* Profile page */
-.profile-content.a11y-large { font-size: 1.06rem; }
-.profile-content.a11y-large .form-input,
-.profile-content.a11y-large .form-select,
-.profile-content.a11y-large .form-textarea { font-size: 1rem; }
+.page-back { border: 0; background: none; color: var(--blue); cursor: pointer; font-size: var(--text-sm); font-weight: 700; padding: 0; margin: 0 0 12px; }
 
 .toggle-row {
   display: flex;

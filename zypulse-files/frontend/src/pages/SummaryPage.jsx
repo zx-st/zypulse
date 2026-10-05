@@ -10,6 +10,7 @@ export default function SummaryPage({ userId, language, setPage }) {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState(null)
   const [error, setError] = useState(null)
+  const backLabel = language === 'zh' ? '← 返回个人资料' : '← Back to profile'
 
   useEffect(() => {
     loadAll()
@@ -81,6 +82,7 @@ export default function SummaryPage({ userId, language, setPage }) {
   return (
     <div>
       <div className="card">
+        <button className="page-back" onClick={() => setPage('profile')}>{backLabel}</button>
         <div className="card-title">🩺 Health Summary</div>
         <div className="summary-grid">
           <div className="summary-cell">

@@ -32,6 +32,8 @@ from ..engine.calculations import CalculationEngine
 from ..engine.safety import SafetyEngine
 from ..engine.ai_orchestrator import AIOrchestrator
 from ..services.sport_facilities import sport_facilities_provider
+from ..services.reminders import dispatch_due_reminders
+from ..time_utils import now_utc_iso, today_sg_iso
 
 router = APIRouter(prefix="/api", tags=["zypulse"])
 
@@ -83,7 +85,7 @@ async def log_glucose(req: GlucoseLogRequest):
         value_text=f"{req.value} mmol/L",
         notes=req.notes,
         source=req.source,
-        recorded_at=datetime.now().isoformat(),
+        recorded_at=now_utc_iso(),
     )
     db.add_audit_event("glucose_logged", "allow", f"record_id={record_id}, value={req.value}", req.user_id)
     return {"success": True, "record_id": record_id, "message": "Glucose reading saved."}
@@ -100,7 +102,7 @@ async def log_medication(req: MedicationLogRequest):
         value_text=req.status,
         notes=f"{req.medication_name} {req.dose} - {req.status}" + (f". {req.notes}" if req.notes else ""),
         source="user_entry",
-        recorded_at=datetime.now().isoformat(),
+        recorded_at=now_utc_iso(),
     )
     db.add_audit_event("medication_logged", "allow", f"record_id={record_id}, status={req.status}", req.user_id)
     return {"success": True, "record_id": record_id, "message": "Medication status saved."}
@@ -117,7 +119,7 @@ async def log_activity(req: ActivityLogRequest):
         value_text=json.dumps({"type": req.activity_type, "location": req.location}),
         notes=f"{req.activity_type} - {req.duration_min}min" + (f" at {req.location}" if req.location else ""),
         source="user_entry",
-        recorded_at=datetime.now().isoformat(),
+        recorded_at=now_utc_iso(),
     )
     db.add_audit_event("activity_logged", "allow", f"record_id={record_id}, type={req.activity_type}", req.user_id)
     return {"success": True, "record_id": record_id, "message": "Activity saved."}
@@ -297,7 +299,23 @@ async def update_preferences(user_id: str, req: PreferencesUpdate):
     """Update user preferences."""
     update_data = {k: v for k, v in req.dict().items() if v is not None}
     db.upsert_preferences(user_id, **update_data)
+    db.add_audit_event("preferences_updated", "allow", "preferences saved", user_id)
     return {"success": True, "message": "Preferences updated."}
+
+
+@router.get("/notifications", response_model=list)
+async def get_notifications(user_id: str, limit: int = 50):
+    """Return persisted reminder deliveries; schedules are fixed to Asia/Singapore."""
+    dispatch_due_reminders(db)
+    return db.get_notifications(user_id, limit=min(limit, 100))
+
+
+@router.put("/notifications/{notification_id}/read", response_model=dict)
+async def read_notification(notification_id: int, user_id: str):
+    if not db.mark_notification_read(notification_id, user_id):
+        raise HTTPException(status_code=404, detail="Notification not found")
+    db.add_audit_event("notification_read", "allow", f"notification_id={notification_id}", user_id)
+    return {"success": True}
 
 
 # ============================================================
@@ -338,7 +356,7 @@ async def get_history(
 @router.post("/notes", response_model=NoteResponse)
 async def create_note(req: NoteCreateRequest):
     """Create a user note. Stored deterministically; never sent to the LLM."""
-    recorded_date = req.recorded_date or datetime.now().isoformat()[:10]
+    recorded_date = req.recorded_date or today_sg_iso()
     record_id = db.add_health_record(
         user_id=req.user_id,
         record_type="note",
@@ -346,7 +364,7 @@ async def create_note(req: NoteCreateRequest):
         value_text=req.content,
         include_in_visit_summary=req.include_in_visit,
         source="user_entry",
-        recorded_at=datetime.now().isoformat(),
+        recorded_at=now_utc_iso(),
     )
     db.add_audit_event("note_created", "allow", f"record_id={record_id}", req.user_id)
     note = db.get_health_records(req.user_id, record_type="note", limit=1)
@@ -357,7 +375,7 @@ async def create_note(req: NoteCreateRequest):
         content=req.content,
         include_in_visit=bool(note.get("include_in_visit_summary", 0)),
         recorded_date=recorded_date,
-        recorded_at=note.get("recorded_at", datetime.now().isoformat()),
+        recorded_at=note.get("recorded_at", now_utc_iso()),
     )
 
 
@@ -429,7 +447,7 @@ async def create_meal(req: MealLogRequest):
         value_text=value_text,
         notes=req.notes,
         source="user_entry",
-        recorded_at=datetime.now().isoformat(),
+        recorded_at=now_utc_iso(),
         include_in_visit_summary=req.include_in_visit,
     )
     db.add_audit_event("meal_logged", "allow", f"record_id={record_id}, items={len(items)}, carbs={total_carbs}", req.user_id)

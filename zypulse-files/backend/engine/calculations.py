@@ -13,6 +13,7 @@ Safety restrictions:
 
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
+from ..time_utils import now_utc_iso
 
 
 class CalculationEngine:
@@ -198,7 +199,7 @@ class CalculationEngine:
             "glucose_evening": glucose_evening,
             "medication_adherence": med_adherence,
             "activity": activity,
-            "generated_at": datetime.now().isoformat(),
+            "generated_at": now_utc_iso(),
             "generated_by": "deterministic_engine",
             "note": "All values calculated by deterministic Python code. AI may explain but not recalculate.",
         }
