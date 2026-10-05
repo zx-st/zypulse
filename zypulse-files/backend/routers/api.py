@@ -16,6 +16,7 @@ import os
 from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from typing import Optional
+import requests
 
 from ..models.schemas import (
     GlucoseLogRequest, MedicationLogRequest, ActivityLogRequest,
@@ -30,6 +31,7 @@ from ..db.data_access import get_db
 from ..engine.calculations import CalculationEngine
 from ..engine.safety import SafetyEngine
 from ..engine.ai_orchestrator import AIOrchestrator
+from ..services.sport_facilities import sport_facilities_provider
 
 router = APIRouter(prefix="/api", tags=["zypulse"])
 
@@ -515,26 +517,20 @@ async def search_activities(
     location_area: Optional[str] = None,
     activity_type: Optional[str] = None,
     intensity: Optional[str] = None,
+    limit: int = 100,
 ):
-    """Search the demo activity catalogue. All activities are SIMULATED."""
-    catalogue_path = os.path.join(os.path.dirname(__file__), "..", "data", "activity_catalogue.json")
-    catalogue_path = os.path.abspath(catalogue_path)
+    """List real Singapore sports facilities and the facility types they offer.
 
-    with open(catalogue_path, "r", encoding="utf-8") as f:
-        catalogue = json.load(f)
-
-    activities = catalogue["activities"]
-
-    # Apply deterministic filters
-    if location_area:
-        activities = [a for a in activities if a["location_area"].lower() == location_area.lower()]
-    if activity_type:
-        activities = [a for a in activities if activity_type.lower() in a["type"].lower()]
-    if intensity:
-        activities = [a for a in activities if a["intensity"].lower() == intensity.lower()]
-
-    # Add simulation warning to each
-    for a in activities:
-        a["warning"] = "DEMO/SYNTHETIC - Not a live Healthy 365 listing."
-
-    return activities
+    The public source contains venue data rather than class schedules, booking
+    availability, or registrations. ``user_id`` is never sent to data.gov.sg.
+    """
+    try:
+        facilities = sport_facilities_provider.list_facilities(activity_type=activity_type)
+        # The public census has thousands of venues; cap results to keep the
+        # mobile client responsive until a location-based search is added.
+        return facilities[:max(1, min(limit, 200))]
+    except requests.RequestException as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Sports facility data is temporarily unavailable. Please try again later.",
+        ) from exc

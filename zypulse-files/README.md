@@ -32,6 +32,8 @@ zyPulse/
 │   │   ├── calculations.py  # C3: Deterministic calc engine
 │   │   ├── safety.py        # C4: Safety/policy engine (non-bypassable)
 │   │   └── ai_orchestrator.py # C5: Single LLM call
+│   ├── services/
+│   │   └── sport_facilities.py # Sport Singapore public facility-data adapter
 │   ├── db/
 │   │   ├── schema.py         # SQLite 5 separated tables
 │   │   ├── data_access.py    # Data access layer
@@ -39,8 +41,7 @@ zyPulse/
 │   ├── models/
 │   │   └── schemas.py        # Pydantic validation models
 │   └── data/
-│       ├── mr_tan_30day.json # Synthetic 30-day data
-│       └── activity_catalogue.json
+│       └── mr_tan_30day.json # Synthetic 30-day data
 ├── frontend/
 │   ├── src/
 │   │   ├── App.jsx           # Main app with navigation
@@ -92,3 +93,11 @@ python -m uvicorn backend.main:app --reload --port 8000
 ```
 
 The app uses OpenAI's Responses API with `store: false`; if a key is absent, it stays in deterministic fallback mode. The generic `ZYPULSE_LLM_*` configuration remains supported for an OpenAI-compatible or Tencent Hunyuan endpoint.
+
+## Sports facility data
+
+`GET /api/activities` retrieves the public Sport Singapore `Sport Facilities`
+dataset through data.gov.sg, then caches and groups its facility types by venue.
+It contains facility capabilities, not class schedules or booking availability.
+For production, set `DATA_GOV_SG_API_KEY` in `backend/.env` to use a registered
+data.gov.sg API key; the source is public and also works without one for testing.
