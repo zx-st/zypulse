@@ -142,7 +142,7 @@ class HealthRecordResponse(BaseModel):
 class ChatRequest(BaseModel):
     user_id: str = Field(..., min_length=1, max_length=100)
     message: str = Field(..., min_length=1, max_length=1000, description="User message")
-    language: str = Field("en", pattern="^(en|zh|ms|ta)$")
+    language: str = Field("en", pattern="^(en|zh)$")
 
 
 class ChatResponse(BaseModel):
@@ -156,7 +156,7 @@ class ChatResponse(BaseModel):
 
 class DailyBriefingRequest(BaseModel):
     user_id: str = Field(..., min_length=1, max_length=100)
-    language: str = Field("en", pattern="^(en|zh|ms|ta)$")
+    language: str = Field("en", pattern="^(en|zh)$")
 
 
 class DailyBriefingResponse(BaseModel):
@@ -170,7 +170,7 @@ class DailyBriefingResponse(BaseModel):
 # ============================================================
 
 class PreferencesUpdate(BaseModel):
-    language: Optional[str] = Field(None, pattern="^(en|zh|ms|ta)$")
+    language: Optional[str] = Field(None, pattern="^(en|zh)$")
     location_area: Optional[str] = None
     display_name: Optional[str] = Field(None, max_length=100)
     contact_email: Optional[str] = Field(None, max_length=200)

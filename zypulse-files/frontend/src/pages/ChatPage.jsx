@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../api/client.js'
+import { translateText } from '../i18n.jsx'
 
 const INITIAL_GREETING = {
   role: 'assistant',
@@ -7,7 +8,8 @@ const INITIAL_GREETING = {
 }
 
 export default function ChatPage({ userId, language }) {
-  const [messages, setMessages] = useState([INITIAL_GREETING])
+  const t = (text) => translateText(language, text)
+  const [messages, setMessages] = useState(() => [{ ...INITIAL_GREETING, content: translateText(language, INITIAL_GREETING.content) }])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -18,6 +20,12 @@ export default function ChatPage({ userId, language }) {
     // For MVP, we start with the greeting. History is in the backend.
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    setMessages(current => current.length === 1 && current[0].role === 'assistant'
+      ? [{ ...INITIAL_GREETING, content: translateText(language, INITIAL_GREETING.content) }]
+      : current)
+  }, [language])
 
   const handleSend = async () => {
     if (!input.trim() || loading) return
@@ -80,7 +88,7 @@ export default function ChatPage({ userId, language }) {
         ))}
         {loading && (
           <div className="chat-msg assistant">
-            <span style={{ opacity: 0.6 }}>ZyPulse is thinking...</span>
+            <span style={{ opacity: 0.6 }}>{t('ZyPulse is thinking...')}</span>
           </div>
         )}
         {error && <div className="error-msg">{error}</div>}
@@ -91,7 +99,7 @@ export default function ChatPage({ userId, language }) {
         <input
           className="chat-input"
           type="text"
-          placeholder="Ask about your trends, log a reading, or get self-care tips..."
+          placeholder={t('Ask about your trends, log a reading, or get self-care tips...')}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyPress={handleKeyPress}

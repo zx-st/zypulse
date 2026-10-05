@@ -172,7 +172,7 @@ class AIOrchestrator:
         """
         Assemble the full prompt as a list of messages.
         """
-        language_names = {"en": "English", "zh": "Chinese", "ms": "Malay", "ta": "Tamil"}
+        language_names = {"en": "English", "zh": "Chinese"}
         lang_name = language_names.get(language, "English")
 
         messages = []

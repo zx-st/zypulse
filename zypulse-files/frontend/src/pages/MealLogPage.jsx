@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client.js'
+import { translateText } from '../i18n.jsx'
 
 const PORTIONS = [
   { key: '0.25', label: '1/4', factor: 0.25 },
@@ -37,7 +38,8 @@ function emptyDraft() {
   }
 }
 
-export default function MealLogPage({ userId }) {
+export default function MealLogPage({ userId, language }) {
+  const t = (text) => translateText(language, text)
   const [draft, setDraft] = useState(emptyDraft())
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
@@ -130,19 +132,19 @@ export default function MealLogPage({ userId }) {
           disclaimer: res.disclaimer,
         })
       })
-      .catch((e) => setError('Photo analysis failed: ' + e.message))
+      .catch((e) => setError(t('Photo analysis failed: ') + e.message))
   }
 
   const applyPhotoToDraft = () => {
     setDraft((d) => ({ ...d, items: [...d.items, ...photo.items] }))
     setPhoto(null)
     setPhotoFile(null)
-    setMsg('Simulated photo result added - review portions/values, then save.')
+    setMsg(t('Simulated photo result added - review portions/values, then save.'))
   }
 
   const saveMeal = async () => {
     setError(null); setMsg(null)
-    if (draft.items.length === 0) { setError('Add at least one food or drink.'); return }
+    if (draft.items.length === 0) { setError(t('Add at least one food or drink.')); return }
     setSaving(true)
     try {
       const payload = {
@@ -163,10 +165,10 @@ export default function MealLogPage({ userId }) {
       }
       if (draft.editingId) {
         await api.updateMeal(draft.editingId, payload)
-        setMsg('Meal updated.')
+        setMsg(t('Meal updated.'))
       } else {
         await api.createMeal(payload)
-        setMsg('Meal saved.')
+        setMsg(t('Meal saved.'))
       }
       setDraft(emptyDraft())
       await Promise.all([loadMeals(), loadRecent()])
@@ -193,10 +195,10 @@ export default function MealLogPage({ userId }) {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this meal entry?')) return
+    if (!confirm(t('Delete this meal entry?'))) return
     try {
       await api.deleteMeal(id)
-      setMsg('Meal deleted.')
+      setMsg(t('Meal deleted.'))
       await loadMeals()
     } catch (e) { setError(e.message) }
   }
@@ -204,13 +206,13 @@ export default function MealLogPage({ userId }) {
   return (
     <div>
       <div className="card">
-        <div className="card-title">🍽️ Quick Meal Log</div>
+        <div className="card-title">🍽️ {t('Quick Meal Log')}</div>
         <div className="simulated-tag" style={{ marginBottom: 10 }}>
-          Estimates are illustrative - not clinically precise
+          {t('Estimates are illustrative - not clinically precise')}
         </div>
 
         <div className="form-group">
-          <label className="form-label">Meal</label>
+          <label className="form-label">{t('Meal')}</label>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {MEAL_TYPES.map((t) => (
               <button
@@ -219,20 +221,20 @@ export default function MealLogPage({ userId }) {
                 style={{ flex: 1, textTransform: 'capitalize' }}
                 onClick={() => setDraft((d) => ({ ...d, meal_type: t }))}
               >
-                {t}
+                {translateText(language, t)}
               </button>
             ))}
           </div>
         </div>
 
         {draft.editingId && (
-          <div className="success-msg">Editing meal #{draft.editingId}. Save to update.</div>
+          <div className="success-msg">{t('Editing meal')} #{draft.editingId}。{t('Save to update.')}</div>
         )}
 
         {/* Recent / favourite tags */}
         {recent.length > 0 && (
           <div className="form-group">
-            <label className="form-label">Recent / favourites</label>
+            <label className="form-label">{t('Recent / favourites')}</label>
             <div className="filter-chips">
               {recent.map((r) => (
                 <button key={r.food_name} className="chip" onClick={() => addRecent(r.food_name)}>
@@ -245,11 +247,11 @@ export default function MealLogPage({ userId }) {
 
         {/* Search food */}
         <div className="form-group">
-          <label className="form-label">Search food / drink</label>
+          <label className="form-label">{t('Search food / drink')}</label>
           <input
             className="form-input"
             type="text"
-            placeholder="e.g. chicken rice, teh tarik, water"
+            placeholder={t('e.g. chicken rice, teh tarik, water')}
             value={query}
             onChange={(e) => search(e.target.value)}
           />
@@ -259,7 +261,7 @@ export default function MealLogPage({ userId }) {
                 <button key={f.food_id} className="food-result" onClick={() => addFood(f)}>
                   <span>{f.name}</span>
                   <span className="food-meta">
-                    ~{f.base_carbs}g carb{f.is_sugary_drink ? ' · sugary drink' : ''}
+                    ~{f.base_carbs}g {t('carbs')}{f.is_sugary_drink ? ` · ${t('sugary drink')}` : ''}
                   </span>
                 </button>
               ))}
@@ -274,8 +276,7 @@ export default function MealLogPage({ userId }) {
               <div key={i} className="food-row">
                 <div className="food-row-head">
                   <strong>{it.food_name}</strong>
-                  {it.is_sugary_drink && <span className="simulated-tag">sugary drink</span>}
-                  <button className="link-danger" onClick={() => removeItem(i)}>remove</button>
+                  {it.is_sugary_drink && <span className="simulated-tag">{t('sugary drink')}</span>}<button className="link-danger" onClick={() => removeItem(i)}>{t('remove')}</button>
                 </div>
                 <div className="food-row-controls">
                   <select
@@ -296,7 +297,7 @@ export default function MealLogPage({ userId }) {
                     />
                   )}
                   <label className="food-num">
-                    carbs
+                    {t('carbs')}
                     <input
                       className="form-input" type="number" step="0.1" min="0"
                       value={it.carbs}
@@ -304,7 +305,7 @@ export default function MealLogPage({ userId }) {
                     />
                   </label>
                   <label className="food-num">
-                    sugar
+                    {t('sugar')}
                     <input
                       className="form-input" type="number" step="0.1" min="0"
                       value={it.sugar}
@@ -315,9 +316,7 @@ export default function MealLogPage({ userId }) {
               </div>
             ))}
             <div className="meal-totals">
-              <span>Meal total:</span>
-              <span>~{Math.round(totals.carbs * 10) / 10}g carbs</span>
-              <span>~{Math.round(totals.sugar * 10) / 10}g sugar</span>
+              <span>{t('Meal total:')}</span><span>~{Math.round(totals.carbs * 10) / 10}g {t('carbs')}</span><span>~{Math.round(totals.sugar * 10) / 10}g {t('sugar')}</span>
             </div>
           </div>
         )}
@@ -325,7 +324,7 @@ export default function MealLogPage({ userId }) {
         {/* Photo / scan entry point */}
         <div className="photo-entry">
           <label className="btn btn-secondary btn-sm" style={{ display: 'inline-block', width: 'auto' }}>
-            📷 Scan photo (simulated AI)
+            📷 {t('Scan photo (simulated AI)')}
             <input type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display: 'none' }} />
           </label>
           {photoFile && <span className="photo-filename">📎 {photoFile}</span>}
@@ -335,23 +334,23 @@ export default function MealLogPage({ userId }) {
         {photo && (
           <div className="review-panel">
             <div className="sim-banner">
-              ⚠ SIMULATED recognition - no real vision model is connected. Review and confirm before saving.
+              ⚠ {t('SIMULATED recognition - no real vision model is connected. Review and confirm before saving.')}
             </div>
             {photo.items.map((it, i) => (
               <div key={i} className="food-row">
                 <div className="food-row-head">
                   <strong>{it.food_name}</strong>
-                  {it.is_sugary_drink && <span className="simulated-tag">sugary drink</span>}
+                  {it.is_sugary_drink && <span className="simulated-tag">{t('sugary drink')}</span>}
                 </div>
                 <div className="food-row-controls">
-                  <label className="food-num">carbs
+                  <label className="food-num">{t('carbs')}
                     <input className="form-input" type="number" step="0.1" min="0" value={it.carbs}
                       onChange={(e) => {
                         const v = [...photo.items]; v[i] = { ...v[i], carbs: Number(e.target.value) || 0 };
                         setPhoto((p) => ({ ...p, items: v }))
                       }} />
                   </label>
-                  <label className="food-num">sugar
+                  <label className="food-num">{t('sugar')}
                     <input className="form-input" type="number" step="0.1" min="0" value={it.sugar}
                       onChange={(e) => {
                         const v = [...photo.items]; v[i] = { ...v[i], sugar: Number(e.target.value) || 0 };
@@ -362,19 +361,15 @@ export default function MealLogPage({ userId }) {
               </div>
             ))}
             <div className="meal-totals">
-              <span>Estimated:</span>
-              <span>~{photo.estimated_carbs}g carbs</span>
-              <span>~{photo.estimated_sugar}g sugar</span>
-              {photo.sugary_drink_detected && <span className="simulated-tag">sugary drink detected</span>}
+              <span>{t('Estimated')}</span><span>~{photo.estimated_carbs}g {t('carbs')}</span><span>~{photo.estimated_sugar}g {t('sugar')}</span>{photo.sugary_drink_detected && <span className="simulated-tag">{t('sugary drink detected')}</span>}
             </div>
             <div className="balance-note">{photo.balance}</div>
-            <button className="btn btn-primary btn-sm" onClick={applyPhotoToDraft}>Add to meal &amp; review</button>
-            <button className="btn btn-secondary btn-sm" onClick={() => { setPhoto(null); setPhotoFile(null) }}>Discard</button>
+            <button className="btn btn-primary btn-sm" onClick={applyPhotoToDraft}>{t('Add to meal & review')}</button><button className="btn btn-secondary btn-sm" onClick={() => { setPhoto(null); setPhotoFile(null) }}>{t('Discard')}</button>
           </div>
         )}
 
         <div className="form-group" style={{ marginTop: 12 }}>
-          <label className="form-label">Note (optional)</label>
+          <label className="form-label">{t('Note (optional)')}</label>
           <textarea className="form-textarea" value={draft.notes} maxLength={1000}
             onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
             placeholder="e.g. Felt full after this meal" />
@@ -382,25 +377,25 @@ export default function MealLogPage({ userId }) {
         <label className="checkbox-row">
           <input type="checkbox" checked={draft.include_in_visit}
             onChange={(e) => setDraft((d) => ({ ...d, include_in_visit: e.target.checked }))} />
-          Include this note in visit summary for my doctor
+          {t('Include this note in visit summary for my doctor')}
         </label>
 
         {msg && <div className="success-msg">{msg}</div>}
         {error && <div className="error-msg">{error}</div>}
 
         <button className="btn btn-primary" onClick={saveMeal} disabled={saving}>
-          {saving ? 'Saving...' : draft.editingId ? 'Update Meal' : 'Save Meal'}
+          {saving ? t('Saving...') : draft.editingId ? t('Update Meal') : t('Save Meal')}
         </button>
         {draft.editingId && (
-          <button className="btn btn-secondary" onClick={() => { setDraft(emptyDraft()); setMsg(null) }}>Cancel edit</button>
+          <button className="btn btn-secondary" onClick={() => { setDraft(emptyDraft()); setMsg(null) }}>{t('Cancel edit')}</button>
         )}
       </div>
 
       {/* Logged meals */}
       <div className="card">
-        <div className="card-title">📋 Logged Meals</div>
+        <div className="card-title">📋 {t('Logged Meals')}</div>
         {meals.length === 0 ? (
-          <div className="empty-state">No meals logged yet.</div>
+          <div className="empty-state">{t('No meals logged yet.')}</div>
         ) : (
           meals.map((m) => {
             let parsed = {}
@@ -410,8 +405,7 @@ export default function MealLogPage({ userId }) {
                 <div className="history-icon">🍽️</div>
                 <div className="history-body">
                   <div className="history-title" style={{ textTransform: 'capitalize' }}>
-                    {parsed.meal_type || 'meal'}
-                    {m.include_in_visit_summary && ' · in visit summary'}
+                    {translateText(language, parsed.meal_type || 'meal')}{m.include_in_visit_summary && ` · ${t('in visit summary')}`}
                   </div>
                   <div className="history-detail">
                     {(parsed.items || []).map((it) => it.food_name).join(', ')}
@@ -424,8 +418,7 @@ export default function MealLogPage({ userId }) {
                   {m.notes && <div className="history-sub">“{m.notes}”</div>}
                 </div>
                 <div className="history-actions">
-                  <button className="link-btn" onClick={() => startEdit(m)}>edit</button>
-                  <button className="link-danger" onClick={() => handleDelete(m.record_id)}>delete</button>
+                  <button className="link-btn" onClick={() => startEdit(m)}>{t('edit')}</button><button className="link-danger" onClick={() => handleDelete(m.record_id)}>{t('delete')}</button>
                 </div>
                 <div className="history-date">{m.recorded_date}</div>
               </div>

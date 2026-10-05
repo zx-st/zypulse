@@ -1,13 +1,9 @@
-export default function NavBar({ page, setPage }) {
+import { useTranslation } from '../i18n.jsx'
+
+export default function NavBar({ page, setPage, language }) {
+  const t = useTranslation(language)
   const items = [
-    { key: 'daily', label: 'Today', icon: '☀️' },
-    { key: 'chat', label: 'Coach', icon: '💬' },
-    { key: 'log', label: 'Log', icon: '📝' },
-    { key: 'meals', label: 'Meals', icon: '🍽️' },
-    { key: 'trends', label: 'Trends', icon: '📊' },
-    { key: 'activities', label: 'Connect', icon: '🤝' },
-    { key: 'history', label: 'History', icon: '📜' },
-    { key: 'profile', label: 'Profile', icon: '👤' },
+    { key: 'daily', label: t('today'), icon: '☀️' }, { key: 'chat', label: t('coach'), icon: '💬' }, { key: 'log', label: t('log'), icon: '📝' }, { key: 'meals', label: t('meals'), icon: '🍽️' }, { key: 'trends', label: t('trends'), icon: '📊' }, { key: 'activities', label: t('connect'), icon: '🤝' }, { key: 'history', label: t('history'), icon: '📜' }, { key: 'profile', label: t('profile'), icon: '👤' },
   ]
 
   return (

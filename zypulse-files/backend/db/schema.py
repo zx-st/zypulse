@@ -44,7 +44,7 @@ CREATE INDEX IF NOT EXISTS idx_health_type ON health_records(record_type);
 CREATE TABLE IF NOT EXISTS user_preferences (
     pref_id         INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id         TEXT NOT NULL UNIQUE,
-    language        TEXT DEFAULT 'en',   -- en, zh, ms, ta
+    language        TEXT DEFAULT 'en',   -- en, zh
     location_area   TEXT,
     display_name    TEXT,                -- fictional preferred/display name (no NRIC)
     contact_email   TEXT,                -- optional prototype contact field
@@ -163,6 +163,12 @@ def _run_additive_migrations(conn: sqlite3.Connection) -> None:
     for col, col_type in pref_additions.items():
         if col not in pref_cols:
             conn.execute(f"ALTER TABLE user_preferences ADD COLUMN {col} {col_type}")
+
+    # Only English and Chinese are supported by the client and API. Normalise
+    # legacy preference values so an older profile cannot reintroduce a removed locale.
+    conn.execute(
+        "UPDATE user_preferences SET language = 'en' WHERE language IS NULL OR language NOT IN ('en', 'zh')"
+    )
 
     # Remove the legacy CHECK constraint on health_records.record_type if still present.
     # Record-type validation is enforced in Python (DataAccess.add_health_record),

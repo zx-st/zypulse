@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client.js'
+import { translateText } from '../i18n.jsx'
 
 const FILTERS = [
   { key: 'all', label: 'All' },
@@ -9,15 +10,15 @@ const FILTERS = [
   { key: 'meals', label: 'Meals' },
 ]
 
-function describe(record) {
+function describe(record, t) {
   const type = record.record_type
   if (type === 'glucose_fasting' || type === 'glucose_evening') {
-    const period = type === 'glucose_fasting' ? 'Fasting' : 'Evening'
-    return { icon: '🩸', title: `Glucose (${period})`, detail: `${record.value_numeric} mmol/L`, sub: record.notes || '' }
+    const period = t(type === 'glucose_fasting' ? 'Fasting' : 'Evening')
+    return { icon: '🩸', title: `${t('Glucose')} (${period})`, detail: `${record.value_numeric} mmol/L`, sub: record.notes || '' }
   }
   if (type === 'medication_morning' || type === 'medication_evening') {
-    const period = type === 'medication_morning' ? 'Morning' : 'Evening'
-    return { icon: '💊', title: `Medication (${period})`, detail: record.value_text || '', sub: '' }
+    const period = t(type === 'medication_morning' ? 'Morning' : 'Evening')
+    return { icon: '💊', title: `${t('Medication')} (${period})`, detail: record.value_text || '', sub: '' }
   }
   if (type === 'activity') {
     let meta = {}
@@ -43,7 +44,8 @@ function describe(record) {
   return { icon: '•', title: type, detail: '', sub: '' }
 }
 
-export default function HistoryPage({ userId }) {
+export default function HistoryPage({ userId, language }) {
+  const t = (text) => translateText(language, text)
   const [category, setCategory] = useState('all')
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
@@ -66,13 +68,13 @@ export default function HistoryPage({ userId }) {
     }
   }
 
-  if (loading) return <div className="loading">Loading your history...</div>
+  if (loading) return <div className="loading">{t('Loading your history...')}</div>
   if (error) return <div className="error-msg">{error}</div>
 
   return (
     <div>
       <div className="card">
-        <div className="card-title">📜 My History</div>
+        <div className="card-title">📜 {t('My History')}</div>
         <div className="filter-chips">
           {FILTERS.map((f) => (
             <button
@@ -80,7 +82,7 @@ export default function HistoryPage({ userId }) {
               className={`chip ${category === f.key ? 'active' : ''}`}
               onClick={() => setCategory(f.key)}
             >
-              {f.label}
+              {t(f.label)}
             </button>
           ))}
         </div>
@@ -89,11 +91,11 @@ export default function HistoryPage({ userId }) {
       {records.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">🗒️</div>
-          No {category === 'all' ? '' : category} entries yet.
+          {category === 'all' ? t('No entries yet.') : `${t('No entries yet.')} (${t(category)})`}
         </div>
       ) : (
         records.map((r) => {
-          const d = describe(r)
+          const d = describe(r, t)
           return (
             <div key={r.record_id} className="history-item">
               <div className="history-icon">{d.icon}</div>
