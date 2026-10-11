@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { api } from '../api/client.js'
 import { translateText } from '../i18n.jsx'
 
-export default function LogPage({ userId, language }) {
+export default function LogPage({ userId, language, initialTab = 'glucose', initialLocation = '' }) {
   const t = (text) => translateText(language, text)
-  const [tab, setTab] = useState('glucose')
+  const [tab, setTab] = useState(initialTab)
   const [success, setSuccess] = useState(null)
   const [error, setError] = useState(null)
 
@@ -24,7 +24,7 @@ export default function LogPage({ userId, language }) {
   // Activity form state
   const [actType, setActType] = useState('walking')
   const [actDuration, setActDuration] = useState('')
-  const [actLocation, setActLocation] = useState('')
+  const [actLocation, setActLocation] = useState(initialLocation)
   const [actDate, setActDate] = useState(today)
 
   const handleGlucoseSubmit = async (e) => {
