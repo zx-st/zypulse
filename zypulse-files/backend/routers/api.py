@@ -14,7 +14,7 @@ Handles:
 import json
 import os
 from datetime import datetime
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from typing import Optional
 import requests
 
@@ -33,6 +33,7 @@ from ..engine.safety import SafetyEngine
 from ..engine.ai_orchestrator import AIOrchestrator
 from ..services.sport_facilities import sport_facilities_provider
 from ..services.reminders import dispatch_due_reminders
+from ..services.ai_usage import ai_usage_guard
 from ..time_utils import now_utc_iso, today_sg_iso
 
 router = APIRouter(prefix="/api", tags=["zypulse"])
@@ -53,6 +54,19 @@ def _with_user_context(summary: dict, user_id: str) -> dict:
         if preferences.get(key)
     }
     return summary
+
+
+def _client_id(request: Request, user_id: str) -> str:
+    """Use the forwarded client address when Render's proxy provides it."""
+    forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    address = forwarded or (request.client.host if request.client else "unknown")
+    return f"{user_id}:{address}"
+
+
+def _quota_message(language: str, reason: str, kind: str = "chat") -> str:
+    if language == "zh":
+        return "AI 助手使用过于频繁，请稍后再试。" if reason == "minute" else "今日 AI 助手使用次数已达上限，请明天再试。"
+    return "AI assistant is being used too frequently. Please try again shortly." if reason == "minute" else "Today's AI assistant limit has been reached. Please try again tomorrow."
 
 
 # ============================================================
@@ -130,7 +144,7 @@ async def log_activity(req: ActivityLogRequest):
 # ============================================================
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest):
+async def chat(req: ChatRequest, request: Request):
     """
     Core MONITOR→COACH workflow:
     user question → C3 calc → C4 input screen → C5 LLM → C4 output screen → response
@@ -162,6 +176,15 @@ async def chat(req: ChatRequest):
             safety_detail=input_screen["reason"],
             trends=None,
             audit_id=None,
+        )
+
+    allowed, reason = ai_usage_guard.consume("chat", _client_id(request, req.user_id))
+    if not allowed:
+        db.add_audit_event("ai_quota", "block", f"chat_{reason}_limit", req.user_id)
+        return ChatResponse(
+            response=_quota_message(req.language, reason), language=req.language,
+            safety_status="rate_limited", safety_detail=f"chat {reason} quota reached",
+            trends=None, audit_id=None,
         )
 
     # STEP 2: C3 Calculation Engine - compute deterministic trends
@@ -208,8 +231,15 @@ async def chat(req: ChatRequest):
 
 
 @router.post("/daily-briefing", response_model=DailyBriefingResponse)
-async def daily_briefing(req: DailyBriefingRequest):
+async def daily_briefing(req: DailyBriefingRequest, request: Request):
     """Generate a safety-screened explanation of verified daily briefing data."""
+    allowed, reason = ai_usage_guard.consume("briefing", _client_id(request, req.user_id))
+    if not allowed:
+        db.add_audit_event("ai_quota", "block", f"briefing_{reason}_limit", req.user_id)
+        return DailyBriefingResponse(
+            analysis=_quota_message(req.language, reason, "briefing"),
+            safety_status="rate_limited", safety_detail=f"briefing {reason} quota reached",
+        )
     context = _with_user_context(calc_engine.get_full_summary(req.user_id, days=7), req.user_id)
     result = ai_orchestrator.generate_briefing(context, req.language)
     db.add_audit_event(
@@ -220,6 +250,12 @@ async def daily_briefing(req: DailyBriefingRequest):
         safety_status=result["safety_status"],
         safety_detail=result["safety_detail"],
     )
+
+
+@router.get("/ai-usage", response_model=dict)
+async def get_ai_usage(user_id: str, request: Request):
+    """Return the public demo's remaining AI allowances for this visitor."""
+    return ai_usage_guard.snapshot(_client_id(request, user_id))
 
 
 # ============================================================

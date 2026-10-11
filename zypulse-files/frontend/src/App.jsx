@@ -18,7 +18,16 @@ import { api } from './api/client.js'
 const DEMO_USER = 'mr_tan_001'
 
 export default function App() {
-  const [page, setPage] = useState('daily')
+  const [page, updatePage] = useState('daily')
+  const [activityLocation, setActivityLocation] = useState(null)
+  const setPage = (nextPage) => {
+    setActivityLocation(null)
+    updatePage(nextPage)
+  }
+  const recordActivity = (facility) => {
+    setActivityLocation(facility.title || facility.location || '')
+    updatePage('log')
+  }
   const savedLanguage = localStorage.getItem('zypulse-language')
   const initialLanguage = ['en', 'zh'].includes(savedLanguage) ? savedLanguage : 'en'
   const [language, setLanguage] = useState(initialLanguage)
@@ -43,7 +52,7 @@ export default function App() {
   const pages = {
     daily: <DailyBriefingPage userId={DEMO_USER} language={language} setPage={setPage} />,
     chat: <ChatPage userId={DEMO_USER} language={language} />,
-    log: <LogPage userId={DEMO_USER} language={language} />, trends: <TrendsPage userId={DEMO_USER} language={language} />, activities: <ActivitiesPage userId={DEMO_USER} language={language} />, meals: <MealLogPage userId={DEMO_USER} language={language} />,
+    log: <LogPage userId={DEMO_USER} language={language} initialTab={activityLocation !== null ? 'activity' : 'glucose'} initialLocation={activityLocation ?? ''} />, trends: <TrendsPage userId={DEMO_USER} language={language} />, activities: <ActivitiesPage userId={DEMO_USER} language={language} onRecordActivity={recordActivity} />, meals: <MealLogPage userId={DEMO_USER} language={language} />,
     profile: <ProfilePage userId={DEMO_USER} language={language} setLanguage={updateLanguage} setPage={setPage} setLargerText={setLargerText} />,
     history: <HistoryPage userId={DEMO_USER} language={language} />, notifications: <NotificationsPage userId={DEMO_USER} language={language} setPage={setPage} />,
     summary: <SummaryPage userId={DEMO_USER} language={language} setPage={setPage} />,

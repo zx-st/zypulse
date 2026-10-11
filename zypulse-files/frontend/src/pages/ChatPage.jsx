@@ -13,13 +13,20 @@ export default function ChatPage({ userId, language }) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [usage, setUsage] = useState(null)
   const messagesEndRef = useRef(null)
+
+  const refreshUsage = async () => {
+    try { setUsage(await api.getAiUsage(userId)) } catch { /* coach remains usable if quota display is unavailable */ }
+  }
 
   // Load conversation history on mount
   useEffect(() => {
     // For MVP, we start with the greeting. History is in the backend.
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => { refreshUsage() }, [userId])
 
   useEffect(() => {
     setMessages(current => current.length === 1 && current[0].role === 'assistant'
@@ -53,6 +60,7 @@ export default function ChatPage({ userId, language }) {
       setError('Unable to reach ZyPulse. Please try again.')
     } finally {
       setLoading(false)
+      refreshUsage()
     }
   }
 
@@ -79,6 +87,11 @@ export default function ChatPage({ userId, language }) {
 
   return (
     <div className="chat-container">
+      {usage && <div className="chat-usage" aria-live="polite">
+        {language === 'zh'
+          ? `今日 AI 助手剩余 ${usage.chat.remaining_today} / ${usage.chat.daily_limit} 次`
+          : `${usage.chat.remaining_today} / ${usage.chat.daily_limit} AI questions remaining today`}
+      </div>}
       <div className="chat-messages">
         {messages.map((msg, idx) => (
           <div key={idx} className={`chat-msg ${msg.role}`}>
