@@ -12,6 +12,7 @@ from typing import Optional, List, Dict, Any
 
 from .schema import get_connection
 from ..time_utils import now_utc_iso
+from ..services import photo_storage
 
 
 class DataAccess:
@@ -38,6 +39,7 @@ class DataAccess:
         source: str = "user_entry",
         recorded_at: Optional[str] = None,
         include_in_visit_summary: bool = False,
+        photo_ref: Optional[str] = None,
     ) -> int:
         """Insert a single health record."""
         if recorded_at is None:
@@ -56,12 +58,12 @@ class DataAccess:
             """
             INSERT INTO health_records
                 (user_id, record_type, value_numeric, value_text,
-                 recorded_date, recorded_at, notes, source, include_in_visit_summary)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 recorded_date, recorded_at, notes, source, include_in_visit_summary, photo_ref)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (user_id, record_type, value_numeric, value_text,
              recorded_date, recorded_at, notes, source,
-             1 if include_in_visit_summary else 0),
+             1 if include_in_visit_summary else 0, photo_ref),
         )
         record_id = cursor.lastrowid
         conn.commit()
@@ -219,6 +221,7 @@ class DataAccess:
         self, record_id: int,
         meal_type: str, items: List[Dict[str, Any]],
         notes: Optional[str], include_in_visit: bool,
+        photo_ref: Optional[str] = None,
     ) -> bool:
         """Update an existing meal record."""
         conn = self._conn()
@@ -231,30 +234,141 @@ class DataAccess:
             raise ValueError(f"Meal record {record_id} not found")
         total_carbs = round(sum(float(i.get("carbs") or 0) for i in items), 1)
         value_text = json.dumps({"meal_type": meal_type, "items": items}, ensure_ascii=False)
-        conn.execute(
-            """
-            UPDATE health_records
-            SET value_text = ?, value_numeric = ?, notes = ?,
-                include_in_visit_summary = ?,
-                created_at = ?
-            WHERE record_id = ?
-            """,
-            (value_text, total_carbs, notes, 1 if include_in_visit else 0, now_utc_iso(), record_id),
-        )
+        set_clause = "value_text = ?, value_numeric = ?, notes = ?, include_in_visit_summary = ?, created_at = ?"
+        params = [value_text, total_carbs, notes, 1 if include_in_visit else 0, now_utc_iso()]
+        if photo_ref is not None:
+            set_clause += ", photo_ref = ?"
+            params.append(photo_ref)
+        set_clause += " WHERE record_id = ?"
+        params.append(record_id)
+        conn.execute(f"UPDATE health_records SET {set_clause}", params)
         conn.commit()
         conn.close()
         return True
 
     def delete_meal(self, record_id: int) -> bool:
-        """Delete a meal record."""
+        """Delete a meal record.
+
+        Follows the existing deletion behaviour (hard delete of the row) and
+        applies it consistently to a photo the user uploaded for that meal:
+        the stored original is removed together with the record.
+        """
         conn = self._conn()
+        row = conn.execute(
+            "SELECT photo_ref FROM health_records WHERE record_id = ? AND record_type = 'meal'",
+            (record_id,),
+        ).fetchone()
         conn.execute(
             "DELETE FROM health_records WHERE record_id = ? AND record_type = 'meal'",
             (record_id,),
         )
         conn.commit()
         conn.close()
+        if row:
+            self.delete_photo_for_record(record_id, photo_ref=row["photo_ref"])
         return True
+
+    # ---- Photo assets (private uploaded originals) ----
+
+    def create_photo_asset(
+        self, user_id: str, photo_key: str, content_type: str, byte_size: int,
+        stored_path: str, checksum: Optional[str], original_name: Optional[str],
+    ) -> None:
+        conn = self._conn()
+        conn.execute(
+            """
+            INSERT INTO photo_assets
+                (photo_key, user_id, original_name, content_type, byte_size,
+                 stored_path, checksum, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+            """,
+            (photo_key, user_id, original_name, content_type, byte_size,
+             stored_path, checksum),
+        )
+        conn.commit()
+        conn.close()
+
+    def get_photo_asset(self, photo_key: str) -> Optional[Dict[str, Any]]:
+        conn = self._conn()
+        row = conn.execute(
+            "SELECT * FROM photo_assets WHERE photo_key = ?", (photo_key,)
+        ).fetchone()
+        conn.close()
+        return dict(row) if row else None
+
+    def attach_photo_asset(self, photo_key: str, user_id: str, record_id: int) -> Dict[str, Any]:
+        """Link an uploaded photo to the record it was confirmed into.
+
+        Returns {'attached': bool, 'duplicate': bool, 'owned': bool}.
+        A photo can only be attached to ONE record, so confirming the same
+        upload twice cannot create a second log entry pointing at it.
+        """
+        conn = self._conn()
+        row = conn.execute(
+            "SELECT user_id, record_id, status FROM photo_assets WHERE photo_key = ?",
+            (photo_key,),
+        ).fetchone()
+        if not row:
+            conn.close()
+            return {"attached": False, "duplicate": False, "owned": False}
+        if row["user_id"] != user_id:
+            conn.close()
+            return {"attached": False, "duplicate": False, "owned": False}
+        if row["record_id"] is not None:
+            conn.close()
+            return {
+                "attached": False,
+                "duplicate": True,
+                "owned": True,
+                "record_id": row["record_id"],
+            }
+        conn.execute(
+            "UPDATE photo_assets SET record_id = ?, status = 'attached', attached_at = ? "
+            "WHERE photo_key = ?",
+            (record_id, now_utc_iso(), photo_key),
+        )
+        conn.commit()
+        conn.close()
+        return {"attached": True, "duplicate": False, "owned": True, "record_id": record_id}
+
+    def delete_photo_asset(self, photo_key: str, user_id: str) -> Dict[str, Any]:
+        """Delete a photo that is not attached to any record (cancel/rollback)."""
+        conn = self._conn()
+        row = conn.execute(
+            "SELECT user_id, record_id, stored_path FROM photo_assets WHERE photo_key = ?",
+            (photo_key,),
+        ).fetchone()
+        if not row or row["user_id"] != user_id or row["record_id"] is not None:
+            conn.close()
+            return {"deleted": False, "reason": "not found or already attached"}
+        photo_storage.remove(row["stored_path"])
+        conn.execute("DELETE FROM photo_assets WHERE photo_key = ?", (photo_key,))
+        conn.commit()
+        conn.close()
+        return {"deleted": True}
+
+    def delete_photo_for_record(self, record_id: int, photo_ref: Optional[str] = None) -> bool:
+        """Remove the uploaded original attached to a record (used on delete)."""
+        key = photo_storage.parse_photo_ref(photo_ref)
+        if not key:
+            return False
+        conn = self._conn()
+        row = conn.execute(
+            "SELECT stored_path FROM photo_assets WHERE photo_key = ?", (key,)
+        ).fetchone()
+        if row:
+            photo_storage.remove(row["stored_path"])
+            conn.execute("DELETE FROM photo_assets WHERE photo_key = ?", (key,))
+            conn.commit()
+        conn.close()
+        return bool(row)
+
+    def purge_orphan_photos(self) -> Dict[str, int]:
+        conn = self._conn()
+        try:
+            return photo_storage.purge_orphans(conn)
+        finally:
+            conn.close()
 
     def get_recent_foods(self, user_id: str, limit: int = 12) -> List[Dict[str, Any]]:
         """Derive recent/favourite food tags from previously logged meals.

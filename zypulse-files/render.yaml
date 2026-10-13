@@ -1,0 +1,32 @@
+# Optional Render Blueprint - single Web Service on the Free plan.
+#
+# If you configure the service manually instead, use:
+#   Root Directory : the folder containing backend/ and frontend/ (see README)
+#   Build Command  : ./build.sh
+#   Start Command  : python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+services:
+  - type: web
+    name: zypulse
+    runtime: python
+    plan: free
+    # Change to the sub-folder that contains backend/ and frontend/ if this
+    # project is not at the root of your repository (for example: zypulse-files).
+    rootDir: .
+    buildCommand: ./build.sh
+    startCommand: python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      # Required so Render installs a Node toolchain on a Python service.
+      - key: NODE_VERSION
+        value: "22"
+      # Optional: comma-separated extra CORS origins (same-origin needs none).
+      - key: FRONTEND_ORIGINS
+        sync: false
+      # Optional: conversational AI is optional; the app falls back to
+      # deterministic text if it is absent. Never commit the real value.
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false

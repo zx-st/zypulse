@@ -63,7 +63,29 @@ export const api = {
   getMeals: (userId) => request(`/meals?user_id=${userId}`),
   updateMeal: (recordId, data) => request(`/meals/${recordId}`, { method: 'PUT', body: data }),
   deleteMeal: (recordId) => request(`/meals/${recordId}`, { method: 'DELETE' }),
+  getPhotoSamples: (category) => request(`/photo-samples?category=${category}`),
   analyzePhoto: (data) => request('/photo-analyze', { method: 'POST', body: data }),
+
+  // Uploaded originals (private storage, ownership-checked reads)
+  uploadPhoto: async (file, userId) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('user_id', userId);
+    const response = await fetch(`${API_BASE}/photos/upload`, { method: 'POST', body: form });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: 'Upload failed' }));
+      throw new Error(err.detail || `HTTP ${response.status}`);
+    }
+    return response.json();
+  },
+  attachPhoto: (photoKey, userId, recordId) =>
+    request(`/photos/${photoKey}/attach?user_id=${encodeURIComponent(userId)}&record_id=${recordId}`, { method: 'POST' }),
+  discardPhoto: (photoKey, userId) =>
+    request(`/photos/${photoKey}?user_id=${encodeURIComponent(userId)}`, { method: 'DELETE' }),
+  // Uploaded photos are not public files: they are read through an endpoint
+  // that checks the owner, so the URL always carries the user id.
+  photoUrl: (photoKey, userId) =>
+    `${API_BASE}/photos/${photoKey}?user_id=${encodeURIComponent(userId)}`,
 
   // Activities
   searchActivities: (params) => {

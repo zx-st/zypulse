@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { api } from '../api/client.js'
 import { translateText } from '../i18n.jsx'
+import PhotoLogWorkflow from '../components/PhotoLogWorkflow.jsx'
 
 export default function LogPage({ userId, language, initialTab = 'glucose', initialLocation = '' }) {
   const t = (text) => translateText(language, text)
   const [tab, setTab] = useState(initialTab)
   const [success, setSuccess] = useState(null)
   const [error, setError] = useState(null)
+  const [glucosePhotoOpen, setGlucosePhotoOpen] = useState(false)
+  const [medPhotoOpen, setMedPhotoOpen] = useState(false)
 
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Singapore' }).format(new Date())
 
@@ -94,6 +97,34 @@ export default function LogPage({ userId, language, initialTab = 'glucose', init
     }
   }
 
+  const confirmGlucosePhoto = async (payload) => {
+    const res = await api.logGlucose({
+      user_id: userId,
+      value: payload.value,
+      period: payload.period,
+      recorded_date: payload.recorded_date,
+      notes: payload.notes,
+      photo_ref: payload.photo_ref,
+    })
+    setSuccess(t('Glucose reading saved from photo.'))
+    return res // lets the photo workflow attach the uploaded original
+  }
+
+  const confirmMedPhoto = async (payload) => {
+    const res = await api.logMedication({
+      user_id: userId,
+      period: payload.period,
+      status: payload.status,
+      medication_name: payload.medication_name,
+      dose: payload.dose,
+      recorded_date: today,
+      notes: payload.notes,
+      photo_ref: payload.photo_ref,
+    })
+    setSuccess(t('Medication logged from photo.'))
+    return res
+  }
+
   return (
     <div>
       <div className="card">
@@ -116,7 +147,16 @@ export default function LogPage({ userId, language, initialTab = 'glucose', init
         {error && <div className="error-msg">{error}</div>}
 
         {tab === 'glucose' && (
-          <form onSubmit={handleGlucoseSubmit}>
+          <>
+            <div className="photo-entry">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setGlucosePhotoOpen((o) => !o)}>📷 {t('Scan Reading')}</button>
+              <span className="photo-filename">{t('or enter manually below')}</span>
+            </div>
+            {glucosePhotoOpen && (
+              <PhotoLogWorkflow logType="glucose" userId={userId} language={language} today={today}
+                onConfirm={confirmGlucosePhoto} onCancel={() => setGlucosePhotoOpen(false)} />
+            )}
+            <form onSubmit={handleGlucoseSubmit}>
             <div className="form-group">
               <label className="form-label">{t('Reading (mmol/L)')}</label>
               <input
@@ -147,11 +187,21 @@ export default function LogPage({ userId, language, initialTab = 'glucose', init
               <textarea className="form-textarea" value={glucoseNotes} onChange={e => setGlucoseNotes(e.target.value)} placeholder={t('Any observations...')} />
             </div>
             <button type="submit" className="btn btn-primary">{t('Save Reading')}</button>
-          </form>
+            </form>
+          </>
         )}
 
         {tab === 'medication' && (
-          <form onSubmit={handleMedSubmit}>
+          <>
+            <div className="photo-entry">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setMedPhotoOpen((o) => !o)}>📷 {t('Scan Medication')}</button>
+              <span className="photo-filename">{t('or enter manually below')}</span>
+            </div>
+            {medPhotoOpen && (
+              <PhotoLogWorkflow logType="medication" userId={userId} language={language} today={today}
+                onConfirm={confirmMedPhoto} onCancel={() => setMedPhotoOpen(false)} />
+            )}
+            <form onSubmit={handleMedSubmit}>
             <div className="form-group">
               <label className="form-label">{t('Medication')}</label>
               <div style={{ padding: '10px 12px', background: 'var(--gray-light)', borderRadius: 8, fontSize: '0.9rem' }}>
@@ -178,7 +228,8 @@ export default function LogPage({ userId, language, initialTab = 'glucose', init
               <input className="form-input" type="date" value={medDate} onChange={e => setMedDate(e.target.value)} required />
             </div>
             <button type="submit" className="btn btn-primary">{t('Save Status')}</button>
-          </form>
+            </form>
+          </>
         )}
 
         {tab === 'activity' && (

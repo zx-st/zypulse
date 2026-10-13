@@ -16,7 +16,7 @@ Run: uvicorn backend.main:app --reload --port 8000
 import asyncio
 import os
 import sys
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -80,6 +80,44 @@ app.add_middleware(
 app.include_router(api_router)
 
 
+# ---------------------------------------------------------------------------
+# Single-service deployment: serve the compiled React/Vite frontend from
+# FastAPI so the whole prototype runs on ONE Render Web Service.
+#
+# Route order matters and is intentionally:
+#   /openapi.json, /docs, /redoc  (registered by FastAPI at construction)
+#   -> /api/**                    (registered by include_router above)
+#   -> /assets/**, /sample-photos/** and other built files (mounts below)
+#   -> "/" and "/health"
+#   -> SPA catch-all (registered last, at the bottom of this module)
+# ---------------------------------------------------------------------------
+FRONTEND_DIST = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+)
+SPA_INDEX = os.path.join(FRONTEND_DIST, "index.html")
+SPA_AVAILABLE = os.path.isfile(SPA_INDEX)
+
+if SPA_AVAILABLE:
+    from fastapi.staticfiles import StaticFiles
+
+    # Serve every top-level entry of the Vite build output (assets/,
+    # sample-photos/, ...). Mounting per entry keeps "/" free for the SPA shell
+    # and avoids shadowing the API routes above.
+    for _entry in sorted(os.listdir(FRONTEND_DIST)):
+        _src = os.path.join(FRONTEND_DIST, _entry)
+        if os.path.isdir(_src):
+            app.mount(
+                f"/{_entry}",
+                StaticFiles(directory=_src),
+                name=f"spa-{_entry}",
+            )
+else:
+    print(
+        "[ZyPulse] frontend/dist not found - running API only. "
+        "Run ./build.sh (or `pnpm build` in frontend/) to enable the web UI."
+    )
+
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize database and seed data on startup."""
@@ -95,6 +133,17 @@ async def startup_event():
         seed_all(DB_PATH)
     else:
         print("[ZyPulse] Database already has data - skipping seed.")
+
+    # Drop abandoned uploads (never confirmed) and uploads whose record was
+    # deleted, so private photo files do not accumulate without an owner.
+    try:
+        from .db.data_access import get_db as _get_db
+        purged = _get_db(DB_PATH).purge_orphan_photos()
+        if purged["pending_expired"] or purged["missing_record"]:
+            print(f"[ZyPulse] Purged orphan photos: {purged}")
+    except Exception as exc:  # pragma: no cover - never block startup
+        print(f"[ZyPulse] photo purge skipped: {exc}")
+
     global _reminder_task
     _reminder_task = asyncio.create_task(_reminder_loop())
 
@@ -105,17 +154,34 @@ async def shutdown_event():
         _reminder_task.cancel()
 
 
+_API_INFO = {
+    "name": "ZyPulse API",
+    "version": "0.1.0",
+    "status": "running",
+    "description": "Personalised AI Self-Care Companion for Type 2 Diabetes",
+    "safety_notice": "This is a self-care support prototype, not a medical device.",
+    "docs": "/docs",
+    "ui": "React frontend served from / when frontend/dist exists",
+}
+
+
+@app.get("/api/info")
+async def api_info():
+    """Service metadata.
+
+    Keeps the payload previously returned by "/" reachable once the compiled
+    frontend takes over the root path.
+    """
+    return _API_INFO
+
+
 @app.get("/")
 async def root():
-    """Health check endpoint."""
-    return {
-        "name": "ZyPulse API",
-        "version": "0.1.0",
-        "status": "running",
-        "description": "Personalised AI Self-Care Companion for Type 2 Diabetes",
-        "safety_notice": "This is a self-care support prototype, not a medical device.",
-        "docs": "/docs",
-    }
+    """Serve the compiled React app, falling back to API metadata in dev."""
+    if SPA_AVAILABLE:
+        from fastapi.responses import FileResponse
+        return FileResponse(SPA_INDEX)
+    return _API_INFO
 
 
 @app.get("/health")
@@ -124,6 +190,31 @@ async def health():
     return {"status": "ok", "timestamp": now_utc_iso(), "timezone": "Asia/Singapore"}
 
 
+if SPA_AVAILABLE:
+    from fastapi.responses import FileResponse
+
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str):
+        """Serve static files, then fall back to the SPA shell.
+
+        Unknown GET paths return index.html so client-side navigation and deep
+        links render instead of 404. Unknown /api paths still return a real 404
+        so client error handling keeps working.
+        """
+        trimmed = (full_path or "").strip("/")
+        if trimmed == "api" or trimmed.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not Found")
+        candidate = os.path.normpath(os.path.join(FRONTEND_DIST, trimmed))
+        if candidate.startswith(FRONTEND_DIST) and os.path.isfile(candidate):
+            return FileResponse(candidate)
+        return FileResponse(SPA_INDEX)
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        "backend.main:app",
+        host=os.environ.get("HOST", "0.0.0.0"),
+        port=int(os.environ.get("PORT", "8000")),
+        reload=False,
+    )

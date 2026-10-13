@@ -20,6 +20,7 @@ class GlucoseLogRequest(BaseModel):
     recorded_date: str = Field(..., description="ISO date YYYY-MM-DD")
     notes: Optional[str] = Field(None, max_length=500)
     source: str = Field("user_entry", pattern="^(user_entry|DEMO/SYNTHETIC)$")
+    photo_ref: Optional[str] = None
 
     @validator("recorded_date")
     def validate_date(cls, v):
@@ -38,6 +39,7 @@ class MedicationLogRequest(BaseModel):
     dose: str = Field("500mg", max_length=50)
     recorded_date: str = Field(...)
     notes: Optional[str] = Field(None, max_length=500)
+    photo_ref: Optional[str] = None
 
 
 class ActivityLogRequest(BaseModel):
@@ -61,6 +63,9 @@ class MealItem(BaseModel):
     carbs: float = Field(0.0, ge=0, le=1000)
     sugar: float = Field(0.0, ge=0, le=1000)
     is_sugary_drink: bool = False
+    calories: Optional[float] = None  # nutrition estimate, may be None if unavailable
+    protein: Optional[float] = None   # nutrition estimate, may be None if unavailable
+    source: Optional[str] = None      # basis for the nutrition estimate
 
 
 class MealLogRequest(BaseModel):
@@ -70,6 +75,7 @@ class MealLogRequest(BaseModel):
     notes: Optional[str] = Field(None, max_length=1000)
     include_in_visit: bool = False
     recorded_date: Optional[str] = None
+    photo_ref: Optional[str] = None
 
     @validator("recorded_date", always=True)
     def default_date(cls, v):
@@ -108,20 +114,50 @@ class FoodItemResponse(BaseModel):
 
 class PhotoAnalyzeRequest(BaseModel):
     user_id: str = Field(..., min_length=1, max_length=100)
-    filename: Optional[str] = None  # not actually processed (simulation only)
+    category: Optional[str] = Field(None, pattern="^(glucose|medication|meal)$")
+    # Predefined demo sample id. When set, returns deterministic predefined extraction.
+    sample_id: Optional[str] = None
+    # Uploaded file name - NOT processed (no vision); used only to report unrecognised uploads.
+    filename: Optional[str] = None
 
 
 class PhotoAnalyzeResponse(BaseModel):
+    recognized: bool = False
     simulated: bool = True
-    foods: List[MealItem]
-    estimated_carbs: float
-    estimated_sugar: float
-    sugary_drink_detected: bool
-    balance: str
+    category: Optional[str] = None
+    sample_id: Optional[str] = None
+    image: Optional[str] = None  # URL path to the bundled demo image (if recognised)
+    extraction: Optional[Dict[str, Any]] = None  # structured category-specific result
+    reason: Optional[str] = None  # set when not recognised (manual-entry fallback)
     disclaimer: str = (
-        "SIMULATED result - no real vision model is connected. "
-        "Estimates are illustrative and NOT clinically precise. Review and confirm before saving."
+        "SIMULATED recognition - no real vision model is connected. "
+        "Review and confirm before saving."
     )
+
+
+class PhotoUploadResponse(BaseModel):
+    """Result of storing an uploaded original in private storage."""
+    success: bool = True
+    photo_key: str
+    photo_ref: str            # value to store in health_records.photo_ref
+    url: str                  # ownership-checked read endpoint (not a public asset URL)
+    content_type: str
+    byte_size: int
+    original_name: Optional[str] = None
+    status: str = "pending"   # becomes 'attached' once the confirmed log references it
+    storage_notice: str = (
+        "Stored in the application's private upload directory. It is not served "
+        "as a public file and is removed if the linked record is deleted."
+    )
+
+
+class PhotoAttachResponse(BaseModel):
+    success: bool = True
+    photo_key: str
+    record_id: Optional[int] = None
+    attached: bool = False
+    duplicate: bool = False
+    message: Optional[str] = None
 
 
 class HealthRecordResponse(BaseModel):
@@ -134,6 +170,7 @@ class HealthRecordResponse(BaseModel):
     recorded_at: str
     notes: Optional[str]
     source: str
+    photo_ref: Optional[str] = None
 
 
 # ============================================================

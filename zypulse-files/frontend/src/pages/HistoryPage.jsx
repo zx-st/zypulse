@@ -10,23 +10,35 @@ const FILTERS = [
   { key: 'meals', label: 'Meals' },
 ]
 
-function describe(record, t) {
+// Bundled demo images are public assets (/sample-photos/...). Uploaded
+// originals are private: photo_ref is "photo:<key>" and is only readable
+// through the ownership-checked /api/photos endpoint.
+function photoHref(record, userId) {
+  const ref = record.photo_ref
+  if (!ref) return null
+  if (ref.startsWith('photo:')) {
+    return api.photoUrl(ref.slice('photo:'.length), userId)
+  }
+  return ref
+}
+
+function describe(record, t, userId) {
   const type = record.record_type
   if (type === 'glucose_fasting' || type === 'glucose_evening') {
     const period = t(type === 'glucose_fasting' ? 'Fasting' : 'Evening')
-    return { icon: '🩸', title: `${t('Glucose')} (${period})`, detail: `${record.value_numeric} mmol/L`, sub: record.notes || '' }
+    return { icon: '🩸', title: `${t('Glucose')} (${period})`, detail: `${record.value_numeric} mmol/L`, sub: record.notes || '', photo: photoHref(record, userId) }
   }
   if (type === 'medication_morning' || type === 'medication_evening') {
     const period = t(type === 'medication_morning' ? 'Morning' : 'Evening')
-    return { icon: '💊', title: `${t('Medication')} (${period})`, detail: record.value_text || '', sub: '' }
+    return { icon: '💊', title: `${t('Medication')} (${period})`, detail: record.value_text || '', sub: '', photo: photoHref(record, userId) }
   }
   if (type === 'activity') {
     let meta = {}
     try { meta = JSON.parse(record.value_text || '{}') } catch { /* ignore */ }
-    return { icon: '🏃', title: `Activity (${meta.type || 'activity'})`, detail: `${record.value_numeric} min`, sub: meta.location || '' }
+    return { icon: '🏃', title: `Activity (${meta.type || 'activity'})`, detail: `${record.value_numeric} min`, sub: meta.location || '', photo: photoHref(record, userId) }
   }
   if (type === 'note') {
-    return { icon: '📝', title: 'Note', detail: record.value_text || '', sub: record.include_in_visit_summary ? 'Included in visit summary' : '' }
+    return { icon: '📝', title: 'Note', detail: record.value_text || '', sub: record.include_in_visit_summary ? 'Included in visit summary' : '', photo: photoHref(record, userId) }
   }
   if (type === 'meal') {
     let meta = {}
@@ -39,9 +51,9 @@ function describe(record, t) {
       totals ? `~${totals.carbs}g carbs · ~${totals.sugar}g sugar` : '',
       record.include_in_visit_summary ? 'In visit summary' : '',
     ].filter(Boolean).join(' · ')
-    return { icon: '🍽️', title: 'Meal', detail, sub }
+    return { icon: '🍽️', title: 'Meal', detail, sub, photo: photoHref(record, userId) }
   }
-  return { icon: '•', title: type, detail: '', sub: '' }
+  return { icon: '•', title: type, detail: '', sub: '', photo: photoHref(record, userId) }
 }
 
 function formatWhen(iso, fallbackDate) {
@@ -106,7 +118,7 @@ export default function HistoryPage({ userId, language }) {
         </div>
       ) : (
         records.map((r) => {
-          const d = describe(r, t)
+          const d = describe(r, t, userId)
           return (
             <div key={r.record_id} className="history-item">
               <div className="history-icon">{d.icon}</div>
@@ -114,6 +126,9 @@ export default function HistoryPage({ userId, language }) {
                 <div className="history-title">{d.title}</div>
                 <div className="history-detail">{d.detail}</div>
                 {d.sub && <div className="history-sub">{d.sub}</div>}
+                {d.photo && (
+                  <a className="history-photo-link" href={d.photo} target="_blank" rel="noreferrer">📷 {t('View original photo')}</a>
+                )}
               </div>
               <div className="history-date" title={r.recorded_at}>{formatWhen(r.recorded_at, r.recorded_date)}</div>
             </div>
