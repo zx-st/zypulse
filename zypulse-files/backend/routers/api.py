@@ -14,7 +14,8 @@ Handles:
 import json
 import os
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from typing import Optional
 import requests
 
@@ -26,6 +27,7 @@ from ..models.schemas import (
     NoteCreateRequest, NoteUpdateRequest, NoteResponse,
     MealLogRequest, MealUpdateRequest, MealItem,
     FoodItemResponse, PhotoAnalyzeRequest, PhotoAnalyzeResponse,
+    PhotoUploadResponse, PhotoAttachResponse,
 )
 from ..db.data_access import get_db
 from ..engine.calculations import CalculationEngine
@@ -34,6 +36,8 @@ from ..engine.ai_orchestrator import AIOrchestrator
 from ..services.sport_facilities import sport_facilities_provider
 from ..services.reminders import dispatch_due_reminders
 from ..services.ai_usage import ai_usage_guard
+from ..services.photo_recognition import analyze as photo_analyze_svc, list_samples
+from ..services import photo_storage
 from ..time_utils import now_utc_iso, today_sg_iso
 
 router = APIRouter(prefix="/api", tags=["zypulse"])
@@ -100,6 +104,7 @@ async def log_glucose(req: GlucoseLogRequest):
         notes=req.notes,
         source=req.source,
         recorded_at=now_utc_iso(),
+        photo_ref=req.photo_ref,
     )
     db.add_audit_event("glucose_logged", "allow", f"record_id={record_id}, value={req.value}", req.user_id)
     return {"success": True, "record_id": record_id, "message": "Glucose reading saved."}
@@ -117,6 +122,7 @@ async def log_medication(req: MedicationLogRequest):
         notes=f"{req.medication_name} {req.dose} - {req.status}" + (f". {req.notes}" if req.notes else ""),
         source="user_entry",
         recorded_at=now_utc_iso(),
+        photo_ref=req.photo_ref,
     )
     db.add_audit_event("medication_logged", "allow", f"record_id={record_id}, status={req.status}", req.user_id)
     return {"success": True, "record_id": record_id, "message": "Medication status saved."}
@@ -485,6 +491,7 @@ async def create_meal(req: MealLogRequest):
         source="user_entry",
         recorded_at=now_utc_iso(),
         include_in_visit_summary=req.include_in_visit,
+        photo_ref=req.photo_ref,
     )
     db.add_audit_event("meal_logged", "allow", f"record_id={record_id}, items={len(items)}, carbs={total_carbs}", req.user_id)
     return {"success": True, "record_id": record_id, "message": "Meal saved."}
@@ -511,54 +518,148 @@ async def delete_meal_record(record_id: int):
     return {"success": True, "record_id": record_id, "message": "Meal deleted."}
 
 
+@router.get("/photo-samples", response_model=list)
+async def photo_samples(category: Optional[str] = None):
+    """List predefined demo photo samples for the picker UI."""
+    return list_samples(category)
+
+
 @router.post("/photo-analyze", response_model=PhotoAnalyzeResponse)
 async def photo_analyze(req: PhotoAnalyzeRequest):
-    """Photo -> food recognition SIMULATION.
+    """Simulated photo analysis (no real vision model).
 
-    The current environment has NO image/vision capability (no vision model
-    configured). Per design, this returns a clearly-labelled SIMULATED result
-    so the full UI workflow (recognise -> review -> confirm) can be exercised.
-    It is structured to be swapped for a real vision model later: replace the
-    body with a model call and keep the same response shape + user confirmation.
+    Recognises ONLY predefined demo samples via `sample_id`; the same sample id
+    always returns the same deterministic extraction. Any other input (including
+    arbitrary uploads) is reported as unrecognised so the UI can fall back to
+    manual entry. This is the single replaceable seam for a future real Vision
+    API: swap the body for a model call that returns the same `extraction` shape.
     """
-    catalogue = _load_food_catalogue()
-    foods = catalogue.get("foods", [])
-    by_id = {f["food_id"]: f for f in foods}
-
-    # Simulated "recognition": pick two plausible Singapore items from the catalogue.
-    sim_ids = ["nasi_lemak", "teh_tarik"]
-    sim_items: List[MealItem] = []
-    for fid in sim_ids:
-        f = by_id.get(fid)
-        if not f:
-            continue
-        factor = 1.0  # simulated single portion
-        sim_items.append(MealItem(
-            food_id=f["food_id"],
-            food_name=f["name"],
-            portion_key="1",
-            portion_label="1",
-            carbs=round(f["base_carbs"] * factor, 1),
-            sugar=round(f["base_sugar"] * factor, 1),
-            is_sugary_drink=bool(f.get("is_sugary_drink", False)),
-        ))
-
-    est_carbs = round(sum(i.carbs for i in sim_items), 1)
-    est_sugar = round(sum(i.sugar for i in sim_items), 1)
-    sugary = any(i.is_sugary_drink for i in sim_items)
-    balance = (
-        "This simulated meal is rice-based with a sweetened drink. "
-        "Choosing water or unsweetened tea would lower added sugar. "
-        "This is a general observation, not medical advice."
+    result = photo_analyze_svc(
+        category=req.category,
+        sample_id=req.sample_id,
+        filename=req.filename,
     )
-    return PhotoAnalyzeResponse(
-        simulated=True,
-        foods=sim_items,
-        estimated_carbs=est_carbs,
-        estimated_sugar=est_sugar,
-        sugary_drink_detected=sugary,
-        balance=balance,
+    return PhotoAnalyzeResponse(**result)
+
+
+# ============================================================
+# UPLOADED PHOTO ORIGINALS (private storage)
+# ============================================================
+
+@router.post("/photos/upload", response_model=PhotoUploadResponse)
+async def upload_photo(
+    file: UploadFile = File(...),
+    user_id: str = Form(...),
+):
+    """Store an uploaded original in the app's private upload directory.
+
+    The image is NOT analysed - recognition in this prototype is simulated and
+    only knows the bundled demo samples. Uploading only reserves the file; it
+    becomes `attached` when the user confirms the log entry that references it,
+    and it is deleted automatically if that never happens.
+    """
+    if not user_id or len(user_id) > 100:
+        raise HTTPException(status_code=400, detail="A valid user_id is required.")
+    try:
+        data = await file.read()
+    except Exception as exc:  # pragma: no cover - client aborted
+        raise HTTPException(status_code=400, detail="Upload could not be read.") from exc
+
+    try:
+        content_type = photo_storage.validate(file.content_type, data, file.filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=415, detail=str(exc)) from exc
+
+    meta = photo_storage.store(user_id, content_type, data, file.filename)
+    try:
+        db.create_photo_asset(
+            user_id=user_id,
+            photo_key=meta["photo_key"],
+            content_type=meta["content_type"],
+            byte_size=meta["byte_size"],
+            stored_path=meta["stored_path"],
+            checksum=meta["checksum"],
+            original_name=meta["original_name"],
+        )
+    except Exception as exc:
+        photo_storage.remove(meta["stored_path"])
+        raise HTTPException(status_code=500, detail="Could not index the upload.") from exc
+
+    db.add_audit_event(
+        "photo_uploaded", "allow",
+        f"photo_key={meta['photo_key']} bytes={meta['byte_size']} type={content_type}",
+        user_id,
     )
+    return PhotoUploadResponse(
+        photo_key=meta["photo_key"],
+        photo_ref=meta["photo_ref"],
+        url=f"/api/photos/{meta['photo_key']}?user_id={user_id}",
+        content_type=content_type,
+        byte_size=meta["byte_size"],
+        original_name=meta["original_name"] or file.filename,
+    )
+
+
+@router.get("/photos/{photo_key}")
+async def get_photo(photo_key: str, user_id: str):
+    """Serve an uploaded original only to the request that names its owner.
+
+    PROTOTYPE LIMITATION - this is an OWNERSHIP CHECK, NOT AUTHENTICATION.
+    The app has no login, session or token; `user_id` is a plain string supplied
+    by the caller and cannot be verified. The check stops casual URL guessing
+    (a key alone is not enough) but anyone who knows both the photo key and its
+    user id can fetch the image. Do not use this to store real patients' photos.
+
+    Bundled demo images are unaffected - they remain public static assets.
+    """
+    asset = db.get_photo_asset(photo_key)
+    if not asset or asset["user_id"] != user_id:
+        # Do not reveal whether the key exists.
+        raise HTTPException(status_code=404, detail="Photo not found.")
+    path = photo_storage.resolve(asset["stored_path"])
+    if not path:
+        raise HTTPException(status_code=404, detail="Photo not found.")
+    return FileResponse(
+        path,
+        media_type=asset["content_type"],
+        headers={
+            "Cache-Control": "private, no-store",
+            "Content-Disposition": f'inline; filename="{asset["photo_key"]}{photo_storage.ALLOWED_TYPES.get(asset["content_type"], ".img")}"',
+            "X-ZyPulse-Photo-Owner": "checked",
+        },
+    )
+
+
+@router.post("/photos/{photo_key}/attach", response_model=PhotoAttachResponse)
+async def attach_photo(photo_key: str, user_id: str, record_id: int):
+    """Link a stored upload to the confirmed log entry (once only)."""
+    res = db.attach_photo_asset(photo_key, user_id, record_id)
+    if not res.get("owned"):
+        raise HTTPException(status_code=404, detail="Photo not found.")
+    if res.get("duplicate"):
+        return PhotoAttachResponse(
+            photo_key=photo_key,
+            record_id=res.get("record_id"),
+            attached=False,
+            duplicate=True,
+            message="This photo is already attached to a log entry; nothing was duplicated.",
+        )
+    return PhotoAttachResponse(
+        photo_key=photo_key, record_id=record_id, attached=True,
+        message="Photo attached to the log entry.",
+    )
+
+
+@router.delete("/photos/{photo_key}", response_model=dict)
+async def delete_photo(photo_key: str, user_id: str):
+    """Discard an upload that was never confirmed (cancel / failed save)."""
+    res = db.delete_photo_asset(photo_key, user_id)
+    if not res.get("deleted"):
+        raise HTTPException(
+            status_code=409,
+            detail="Photo not found, or it is already attached to a log entry.",
+        )
+    return {"success": True, "photo_key": photo_key, "message": "Upload discarded."}
 
 
 # ============================================================

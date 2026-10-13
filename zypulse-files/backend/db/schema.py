@@ -14,8 +14,13 @@ All synthetic data is labelled with source = 'DEMO/SYNTHETIC'.
 import sqlite3
 import os
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "zypulse.db")
-DB_PATH = os.path.abspath(DB_PATH)
+# Default: backend/zypulse.db (a local prototype file, never committed).
+# ZYPULSE_DB_PATH lets a test run point at an isolated temporary database so it
+# can never read or overwrite the developer's own database.
+DB_PATH = os.path.abspath(
+    os.environ.get("ZYPULSE_DB_PATH")
+    or os.path.join(os.path.dirname(__file__), "..", "zypulse.db")
+)
 
 SCHEMA_SQL = """
 -- ============================================================
@@ -144,6 +149,31 @@ CREATE TABLE IF NOT EXISTS notifications (
     UNIQUE(user_id, reminder_key, due_at)
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, due_at DESC);
+
+-- ============================================================
+-- PHOTO ASSETS (user-uploaded originals attached to a log entry)
+-- ------------------------------------------------------------
+-- Uploaded health photos are stored OUTSIDE the web root (see
+-- services/photo_storage.py) and are only readable through
+-- GET /api/photos/{photo_key}?user_id=... , which checks ownership.
+-- The row is the metadata index; the bytes live in the upload directory.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS photo_assets (
+    photo_key      TEXT PRIMARY KEY,        -- opaque random key used in photo_ref
+    user_id        TEXT NOT NULL,           -- owner; enforced on every read
+    original_name  TEXT,
+    content_type   TEXT NOT NULL,
+    byte_size      INTEGER NOT NULL,
+    stored_path    TEXT NOT NULL,           -- absolute path outside the web root
+    checksum       TEXT,                    -- sha256, used for dedupe reporting
+    record_id      INTEGER,                 -- health_records.record_id once attached
+    status         TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'attached')),
+    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    attached_at    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_photo_user ON photo_assets(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_photo_record ON photo_assets(record_id);
 """
 
 
@@ -166,6 +196,12 @@ def _run_additive_migrations(conn: sqlite3.Connection) -> None:
     if "include_in_visit_summary" not in health_cols:
         conn.execute(
             "ALTER TABLE health_records ADD COLUMN include_in_visit_summary INTEGER NOT NULL DEFAULT 0"
+        )
+
+    health_cols = {row[1] for row in conn.execute("PRAGMA table_info(health_records)")}
+    if "photo_ref" not in health_cols:
+        conn.execute(
+            "ALTER TABLE health_records ADD COLUMN photo_ref TEXT"
         )
 
     pref_cols = {row[1] for row in conn.execute("PRAGMA table_info(user_preferences)")}
@@ -192,9 +228,16 @@ def _run_additive_migrations(conn: sqlite3.Connection) -> None:
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='health_records'"
     ).fetchone()
     if row and row[0] and "CHECK" in row[0].upper():
+        # Columns added by later migrations (photo_ref, ...) must survive the
+        # rebuild, otherwise existing photo references would be dropped.
+        old_cols = {c[1] for c in conn.execute("PRAGMA table_info(health_records)")}
+        optional_cols = [c for c in ("photo_ref",) if c in old_cols]
+        optional_ddl = "".join(f",\n                {c} TEXT" for c in optional_cols)
+        optional_names = "".join(f", {c}" for c in optional_cols)
+
         conn.execute("ALTER TABLE health_records RENAME TO _hr_old")
         conn.execute(
-            """
+            f"""
             CREATE TABLE health_records (
                 record_id      INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id        TEXT NOT NULL,
@@ -206,17 +249,17 @@ def _run_additive_migrations(conn: sqlite3.Connection) -> None:
                 notes          TEXT,
                 source         TEXT DEFAULT 'user_entry',
                 include_in_visit_summary INTEGER NOT NULL DEFAULT 0,
-                created_at     TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+                created_at     TEXT NOT NULL DEFAULT (datetime('now', 'localtime')){optional_ddl}
             )
             """
         )
         conn.execute(
-            """
+            f"""
             INSERT INTO health_records
                 (record_id, user_id, record_type, value_numeric, value_text,
-                 recorded_date, recorded_at, notes, source, include_in_visit_summary, created_at)
+                 recorded_date, recorded_at, notes, source, include_in_visit_summary, created_at{optional_names})
             SELECT record_id, user_id, record_type, value_numeric, value_text,
-                 recorded_date, recorded_at, notes, source, include_in_visit_summary, created_at
+                 recorded_date, recorded_at, notes, source, include_in_visit_summary, created_at{optional_names}
             FROM _hr_old
             """
         )

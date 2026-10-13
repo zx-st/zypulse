@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client.js'
 import { translateText } from '../i18n.jsx'
+import PhotoLogWorkflow from '../components/PhotoLogWorkflow.jsx'
 
 const PORTIONS = [
   { key: '0.25', label: '1/4', factor: 0.25 },
@@ -45,11 +46,85 @@ export default function MealLogPage({ userId, language }) {
   const [results, setResults] = useState([])
   const [recent, setRecent] = useState([])
   const [meals, setMeals] = useState([])
-  const [photo, setPhoto] = useState(null) // simulated review payload
+  const [photo, setPhoto] = useState(null) // kept for backward-compat (unused by new flow)
   const [photoFile, setPhotoFile] = useState(null)
   const [msg, setMsg] = useState(null)
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [favourites, setFavourites] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`zypulse_fav_${userId}`) || '[]') } catch { return [] }
+  })
+
+  const addFavourite = (item) => {
+    const name = typeof item === 'string' ? item : (item?.food_name || '')
+    if (!name) return
+    const entry = typeof item === 'string'
+      ? { food_id: null, food_name: name, base_carbs: 0, base_sugar: 0, is_sugary_drink: false }
+      : {
+        food_id: item.food_id || null,
+        food_name: name,
+        base_carbs: item.base_carbs != null ? Number(item.base_carbs) : 0,
+        base_sugar: item.base_sugar != null ? Number(item.base_sugar) : 0,
+        is_sugary_drink: !!item.is_sugary_drink,
+        source: item.source || null,
+      }
+    setFavourites((prev) => {
+      if (prev.find((f) => f.food_name === name)) return prev
+      const next = [...prev, entry]
+      try { localStorage.setItem(`zypulse_fav_${userId}`, JSON.stringify(next)) } catch { /* ignore */ }
+      return next
+    })
+  }
+
+  const addFavouriteFood = (f) => {
+    const base = {
+      food_id: f.food_id,
+      food_name: f.food_name,
+      base_carbs: f.base_carbs,
+      base_sugar: f.base_sugar,
+      is_sugary_drink: f.is_sugary_drink,
+      portion_key: '1',
+      custom_factor: 1,
+    }
+    setDraft((d) => ({ ...d, items: [...d.items, recompute(base)] }))
+  }
+
+  const savePhotoMeal = async (payload) => {
+    setError(null); setMsg(null)
+    setSaving(true)
+    try {
+      const fullItems = payload.items.map((it) => ({
+        food_id: it.food_id || null,
+        food_name: it.food_name,
+        portion_key: it.portion_key,
+        portion_label: it.portion_label,
+        carbs: it.carbs,
+        sugar: it.sugar,
+        is_sugary_drink: it.is_sugary_drink,
+        calories: it.calories,
+        protein: it.protein,
+        source: it.source,
+      }))
+      const res = await api.createMeal({
+        user_id: userId,
+        meal_type: draft.meal_type,
+        items: fullItems,
+        notes: payload.notes,
+        include_in_visit: draft.include_in_visit,
+        recorded_date: today,
+        photo_ref: payload.photo_ref,
+      })
+      setMsg(t('Meal saved from photo.'))
+      setDraft(emptyDraft())
+      await Promise.all([loadMeals(), loadRecent()])
+      return res // lets the photo workflow attach the uploaded original
+    } catch (e) {
+      setError(e.message)
+      throw e
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Singapore' }).format(new Date())
 
@@ -108,39 +183,6 @@ export default function MealLogPage({ userId, language }) {
     (acc, it) => ({ carbs: acc.carbs + (it.carbs || 0), sugar: acc.sugar + (it.sugar || 0) }),
     { carbs: 0, sugar: 0 }
   )
-
-  const handlePhoto = (e) => {
-    const file = e.target.files && e.target.files[0]
-    if (!file) return
-    setPhotoFile(file.name)
-    setError(null)
-    api.analyzePhoto({ user_id: userId, filename: file.name })
-      .then((res) => {
-        const items = res.foods.map((f) => recompute({
-          food_id: f.food_id, food_name: f.food_name,
-          base_carbs: f.carbs, base_sugar: f.sugar,
-          is_sugary_drink: f.is_sugary_drink,
-          portion_key: f.portion_key || '1', custom_factor: 1,
-        }))
-        setPhoto({
-          simulated: res.simulated,
-          items,
-          estimated_carbs: res.estimated_carbs,
-          estimated_sugar: res.estimated_sugar,
-          sugary_drink_detected: res.sugary_drink_detected,
-          balance: res.balance,
-          disclaimer: res.disclaimer,
-        })
-      })
-      .catch((e) => setError(t('Photo analysis failed: ') + e.message))
-  }
-
-  const applyPhotoToDraft = () => {
-    setDraft((d) => ({ ...d, items: [...d.items, ...photo.items] }))
-    setPhoto(null)
-    setPhotoFile(null)
-    setMsg(t('Simulated photo result added - review portions/values, then save.'))
-  }
 
   const saveMeal = async () => {
     setError(null); setMsg(null)
@@ -245,6 +287,20 @@ export default function MealLogPage({ userId, language }) {
           </div>
         )}
 
+        {/* Saved photo-log favourites (localStorage quick-add) */}
+        {favourites.length > 0 && (
+          <div className="form-group">
+            <label className="form-label">{t('My photo-log favourites')}</label>
+            <div className="filter-chips">
+              {favourites.map((f) => (
+                <button key={f.food_name} className="chip chip-fav" onClick={() => addFavouriteFood(f)}>
+                  ★ {f.food_name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Search food */}
         <div className="form-group">
           <label className="form-label">{t('Search food / drink')}</label>
@@ -321,52 +377,9 @@ export default function MealLogPage({ userId, language }) {
           </div>
         )}
 
-        {/* Photo / scan entry point */}
-        <div className="photo-entry">
-          <label className="btn btn-secondary btn-sm" style={{ display: 'inline-block', width: 'auto' }}>
-            📷 {t('Scan photo (simulated AI)')}
-            <input type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display: 'none' }} />
-          </label>
-          {photoFile && <span className="photo-filename">📎 {photoFile}</span>}
-        </div>
-
-        {/* Simulated photo review */}
-        {photo && (
-          <div className="review-panel">
-            <div className="sim-banner">
-              ⚠ {t('SIMULATED recognition - no real vision model is connected. Review and confirm before saving.')}
-            </div>
-            {photo.items.map((it, i) => (
-              <div key={i} className="food-row">
-                <div className="food-row-head">
-                  <strong>{it.food_name}</strong>
-                  {it.is_sugary_drink && <span className="simulated-tag">{t('sugary drink')}</span>}
-                </div>
-                <div className="food-row-controls">
-                  <label className="food-num">{t('carbs')}
-                    <input className="form-input" type="number" step="0.1" min="0" value={it.carbs}
-                      onChange={(e) => {
-                        const v = [...photo.items]; v[i] = { ...v[i], carbs: Number(e.target.value) || 0 };
-                        setPhoto((p) => ({ ...p, items: v }))
-                      }} />
-                  </label>
-                  <label className="food-num">{t('sugar')}
-                    <input className="form-input" type="number" step="0.1" min="0" value={it.sugar}
-                      onChange={(e) => {
-                        const v = [...photo.items]; v[i] = { ...v[i], sugar: Number(e.target.value) || 0 };
-                        setPhoto((p) => ({ ...p, items: v }))
-                      }} />
-                  </label>
-                </div>
-              </div>
-            ))}
-            <div className="meal-totals">
-              <span>{t('Estimated')}</span><span>~{photo.estimated_carbs}g {t('carbs')}</span><span>~{photo.estimated_sugar}g {t('sugar')}</span>{photo.sugary_drink_detected && <span className="simulated-tag">{t('sugary drink detected')}</span>}
-            </div>
-            <div className="balance-note">{photo.balance}</div>
-            <button className="btn btn-primary btn-sm" onClick={applyPhotoToDraft}>{t('Add to meal & review')}</button><button className="btn btn-secondary btn-sm" onClick={() => { setPhoto(null); setPhotoFile(null) }}>{t('Discard')}</button>
-          </div>
-        )}
+        {/* Shared simulated photo logging workflow (replaces bespoke scan block) */}
+        <PhotoLogWorkflow logType="meal" userId={userId} language={language} today={today}
+          onConfirm={savePhotoMeal} onSaveFavourite={addFavourite} />
 
         <div className="form-group" style={{ marginTop: 12 }}>
           <label className="form-label">{t('Note (optional)')}</label>
