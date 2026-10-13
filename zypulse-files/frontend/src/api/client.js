@@ -52,6 +52,21 @@ export const api = {
   createNote: (data) => request('/notes', { method: 'POST', body: data }),
   getVisitNotes: (userId) => request(`/notes/visit?user_id=${userId}`),
   updateNote: (recordId, data) => request(`/notes/${recordId}`, { method: 'PUT', body: data }),
+  // Doctor-visit note on any log record (glucose / medication / activity / meal)
+  updateVisitNote: (recordId, data) => request(`/records/${recordId}/visit-note`, { method: 'PUT', body: data }),
+
+  // Activity log edit / delete
+  updateActivity: (recordId, data) => request(`/logs/activity/${recordId}`, { method: 'PUT', body: data }),
+  deleteActivity: (recordId) => request(`/logs/activity/${recordId}`, { method: 'DELETE' }),
+
+  // Healthy 365 Connect (synthetic demo catalogue + simulated handoff)
+  getHealthy365Events: (params) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/healthy365/events?${query}`);
+  },
+  getHealthy365Event: (eventId, userId) =>
+    request(`/healthy365/events/${encodeURIComponent(eventId)}?user_id=${encodeURIComponent(userId)}`),
+  registerHealthy365: (data) => request('/healthy365/register', { method: 'POST', body: data }),
 
   // Meal log
   searchFoods: (params = {}) => {

@@ -20,16 +20,19 @@ export default function SummaryPage({ userId, language, setPage }) {
     setLoading(true)
     setError(null)
     try {
-      const [gf, ge, med, act, noteList, mealList] = await Promise.all([
+      const [gf, ge, med, act, noteList, mealList, glucoseList, medicationList, activityList] = await Promise.all([
         api.getTrends({ user_id: userId, metric: 'glucose', period: 'fasting', days: 7 }),
         api.getTrends({ user_id: userId, metric: 'glucose', period: 'evening', days: 7 }),
         api.getTrends({ user_id: userId, metric: 'medication', days: 30 }),
         api.getTrends({ user_id: userId, metric: 'activity', days: 30 }),
         api.getHistory({ user_id: userId, category: 'notes', limit: 200 }),
         api.getHistory({ user_id: userId, category: 'meals', limit: 200 }),
+        api.getHistory({ user_id: userId, category: 'glucose', limit: 200 }),
+        api.getHistory({ user_id: userId, category: 'medication', limit: 200 }),
+        api.getHistory({ user_id: userId, category: 'activity', limit: 200 }),
       ])
       setTrends({ gf, ge, med, act })
-      setNotes(noteList.concat(mealList))
+      setNotes(noteList.concat(mealList, glucoseList, medicationList, activityList))
     } catch (err) {
       setError('Unable to load health summary.')
     } finally {
@@ -37,10 +40,11 @@ export default function SummaryPage({ userId, language, setPage }) {
     }
   }
 
-  // Visit notes = user notes flagged for visit, plus meals flagged with a note.
+  // Visit notes = every log the user opted in, as long as it carries text.
+  // Only opt-in records are shown; everything else stays private to the app.
   const visitNotes = notes.filter(
-    (n) => n.include_in_visit_summary && (n.record_type !== 'meal' || (n.notes && n.notes.trim()))
-  )
+    (n) => n.include_in_visit_summary && (visitNoteText(n) || '').trim()
+  ).sort((a, b) => (b.recorded_at || '').localeCompare(a.recorded_at || ''))
   const suggested = buildSuggestedQuestions(trends)
 
   const handleAddNote = async (e) => {
@@ -129,7 +133,7 @@ export default function SummaryPage({ userId, language, setPage }) {
           </div>
           <label className="checkbox-row">
             <input type="checkbox" checked={includeInVisit} onChange={(e) => setIncludeInVisit(e.target.checked)} />
-            Include in visit summary for my doctor
+            Include this note in visit summary for my doctor
           </label>
           {msg && <div className="success-msg">{msg}</div>}
           {error && <div className="error-msg">{error}</div>}
@@ -143,25 +147,21 @@ export default function SummaryPage({ userId, language, setPage }) {
         <div className="card-title">👨‍⚕️ Notes for My Doctor</div>
         {visitNotes.length === 0 ? (
           <div style={{ fontSize: '0.85rem', color: 'var(--gray)' }}>
-            No notes selected yet. Add a note above and tick "Include in visit summary".
+            No notes selected yet. Add a note above, or tick &quot;Include this note in visit summary for my doctor&quot;
+            on a glucose, medication, activity or meal entry.
           </div>
         ) : (
-          visitNotes.map((n) => {
-            let mealLabel = 'Meal'
-            if (n.record_type === 'meal') {
-              try { mealLabel = (JSON.parse(n.value_text || '{}').meal_type || 'meal') } catch { /* ignore */ }
-            }
-            return (
-              <div key={n.record_id} className="visit-note">
-                <div>
-                  {n.record_type === 'meal'
-                    ? <>🍽️ <em>{mealLabel} note:</em> {n.notes}</>
-                    : n.value_text}
-                </div>
-                <div className="visit-note-date">{n.recorded_date}</div>
+          visitNotes.map((n) => (
+            <div key={n.record_id} className="visit-note">
+              <div>
+                <em>{visitNoteLabel(n)}</em>{' '}
+                {/* Plain text only: React escapes user-entered content, so a note
+                    can never change this page, the questions or any calculation. */}
+                {visitNoteText(n)}
               </div>
-            )
-          })
+              <div className="visit-note-date">{visitNoteWhen(n)}</div>
+            </div>
+          ))
         )}
       </div>
 
@@ -185,6 +185,54 @@ export default function SummaryPage({ userId, language, setPage }) {
       </div>
     </div>
   )
+}
+
+// ---- Visit-summary note helpers -------------------------------------------
+// The text a user opted to share lives in a different column per log type,
+// because medication and activity already use `notes` for a generated summary.
+// Mirrors VISIT_NOTE_TEXT_FIELD on the backend.
+function visitNoteText(record) {
+  if (!record) return ''
+  switch (record.record_type) {
+    case 'note':
+      return record.value_text || ''
+    case 'meal':
+    case 'glucose_fasting':
+    case 'glucose_evening':
+      return record.notes || ''
+    case 'medication_morning':
+    case 'medication_evening':
+    case 'activity':
+    case 'activity_planned':
+      return record.visit_note || ''
+    default:
+      return record.visit_note || record.notes || record.value_text || ''
+  }
+}
+
+function visitNoteLabel(record) {
+  if (record.record_type === 'meal') {
+    let mealType = 'meal'
+    try { mealType = JSON.parse(record.value_text || '{}').meal_type || 'meal' } catch { /* ignore */ }
+    return `🍽️ ${mealType} note:`
+  }
+  const labels = {
+    note: '📝 Note:',
+    glucose_fasting: '🩸 Fasting glucose note:',
+    glucose_evening: '🩸 Evening glucose note:',
+    medication_morning: '💊 Morning medication note:',
+    medication_evening: '💊 Evening medication note:',
+    // Planned is never presented as exercise that was actually done.
+    activity: '🏃 Completed activity note:',
+    activity_planned: '🗓️ Planned activity note (not completed):',
+  }
+  return labels[record.record_type] || '📝 Note:'
+}
+
+function visitNoteWhen(record) {
+  const at = record.recorded_at || ''
+  const time = at.includes('T') ? at.slice(11, 16) : ''
+  return time ? `${record.recorded_date} ${time}` : (record.recorded_date || '')
 }
 
 function TrendLine({ label, avg, note, direction, pct }) {

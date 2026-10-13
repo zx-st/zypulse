@@ -204,6 +204,25 @@ def _run_additive_migrations(conn: sqlite3.Connection) -> None:
             "ALTER TABLE health_records ADD COLUMN photo_ref TEXT"
         )
 
+    # Optional average heart rate (bpm) for activity records. Stays NULL unless
+    # the user enters it - ZyPulse never fabricates a reading and never infers
+    # intensity, fitness or clinical safety from it.
+    health_cols = {row[1] for row in conn.execute("PRAGMA table_info(health_records)")}
+    if "avg_heart_rate" not in health_cols:
+        conn.execute(
+            "ALTER TABLE health_records ADD COLUMN avg_heart_rate INTEGER"
+        )
+
+    # Optional free-text note the user opted into sharing in the doctor visit
+    # summary. Used for medication and activity records, whose `notes` column
+    # already holds a generated summary. NULL = no note, so old rows are
+    # untouched and unreadable-by-design.
+    health_cols = {row[1] for row in conn.execute("PRAGMA table_info(health_records)")}
+    if "visit_note" not in health_cols:
+        conn.execute(
+            "ALTER TABLE health_records ADD COLUMN visit_note TEXT"
+        )
+
     pref_cols = {row[1] for row in conn.execute("PRAGMA table_info(user_preferences)")}
     pref_additions = {
         "display_name": "TEXT",
@@ -228,11 +247,17 @@ def _run_additive_migrations(conn: sqlite3.Connection) -> None:
         "SELECT sql FROM sqlite_master WHERE type='table' AND name='health_records'"
     ).fetchone()
     if row and row[0] and "CHECK" in row[0].upper():
-        # Columns added by later migrations (photo_ref, ...) must survive the
-        # rebuild, otherwise existing photo references would be dropped.
+        # Columns added by later migrations (photo_ref, avg_heart_rate,
+        # visit_note) must survive the rebuild, otherwise existing photo
+        # references, heart rates and visit notes would be dropped.
         old_cols = {c[1] for c in conn.execute("PRAGMA table_info(health_records)")}
-        optional_cols = [c for c in ("photo_ref",) if c in old_cols]
-        optional_ddl = "".join(f",\n                {c} TEXT" for c in optional_cols)
+        optional_cols = [
+            c for c in ("photo_ref", "avg_heart_rate", "visit_note") if c in old_cols
+        ]
+        optional_types = {"photo_ref": "TEXT", "visit_note": "TEXT", "avg_heart_rate": "INTEGER"}
+        optional_ddl = "".join(
+            f",\n                {c} {optional_types[c]}" for c in optional_cols
+        )
         optional_names = "".join(f", {c}" for c in optional_cols)
 
         conn.execute("ALTER TABLE health_records RENAME TO _hr_old")

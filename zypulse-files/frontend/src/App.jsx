@@ -20,12 +20,27 @@ const DEMO_USER = 'mr_tan_001'
 export default function App() {
   const [page, updatePage] = useState('daily')
   const [activityLocation, setActivityLocation] = useState(null)
+  const [activityDraft, setActivityDraft] = useState(null)
   const setPage = (nextPage) => {
     setActivityLocation(null)
+    setActivityDraft(null)
     updatePage(nextPage)
   }
   const recordActivity = (facility) => {
     setActivityLocation(facility.title || facility.location || '')
+    updatePage('log')
+  }
+  // Healthy 365 demo event -> pre-filled (still editable) Activity Log entry.
+  const addToActivityLog = (event, status = 'planned') => {
+    setActivityDraft({
+      activity_type: event.activity_type,
+      duration_min: event.duration_min ?? '',
+      location: event.location_area,
+      recorded_date: event.date,
+      source_event_id: event.event_id,
+      status,
+    })
+    setActivityLocation(null)
     updatePage('log')
   }
   const savedLanguage = localStorage.getItem('zypulse-language')
@@ -52,7 +67,7 @@ export default function App() {
   const pages = {
     daily: <DailyBriefingPage userId={DEMO_USER} language={language} setPage={setPage} />,
     chat: <ChatPage userId={DEMO_USER} language={language} />,
-    log: <LogPage userId={DEMO_USER} language={language} initialTab={activityLocation !== null ? 'activity' : 'glucose'} initialLocation={activityLocation ?? ''} />, trends: <TrendsPage userId={DEMO_USER} language={language} />, activities: <ActivitiesPage userId={DEMO_USER} language={language} onRecordActivity={recordActivity} />, meals: <MealLogPage userId={DEMO_USER} language={language} />,
+    log: <LogPage userId={DEMO_USER} language={language} initialTab={activityLocation !== null || activityDraft !== null ? 'activity' : 'glucose'} initialLocation={activityLocation ?? ''} activityDraft={activityDraft} />, trends: <TrendsPage userId={DEMO_USER} language={language} />, activities: <ActivitiesPage userId={DEMO_USER} language={language} onRecordActivity={recordActivity} onAddToActivityLog={addToActivityLog} />, meals: <MealLogPage userId={DEMO_USER} language={language} />,
     profile: <ProfilePage userId={DEMO_USER} language={language} setLanguage={updateLanguage} setPage={setPage} setLargerText={setLargerText} />,
     history: <HistoryPage userId={DEMO_USER} language={language} />, notifications: <NotificationsPage userId={DEMO_USER} language={language} setPage={setPage} />,
     summary: <SummaryPage userId={DEMO_USER} language={language} setPage={setPage} />,
