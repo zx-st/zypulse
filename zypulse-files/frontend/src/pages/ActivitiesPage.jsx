@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client.js'
 import { translateText } from '../i18n.jsx'
+import Healthy365Section from '../components/Healthy365Section.jsx'
 
-export default function ActivitiesPage({ userId, language, onRecordActivity }) {
+export default function ActivitiesPage({ userId, language, onRecordActivity, onAddToActivityLog }) {
   const t = (text) => translateText(language, text)
   const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
@@ -28,11 +29,10 @@ export default function ActivitiesPage({ userId, language, onRecordActivity }) {
     }
   }
 
-  if (loading) return <div className="loading">{t('Loading activities...')}</div>
-  if (error) return <div className="error-msg">{error}</div>
-
   return (
     <div>
+      <Healthy365Section userId={userId} language={language} onAddToActivityLog={onAddToActivityLog} />
+
       <div className="card">
         <div className="card-title">🤝 {t('Nearby Sports Facilities')}</div>
         <div style={{ fontSize: '0.85rem', color: 'var(--gray)', marginBottom: 12 }}>
@@ -54,7 +54,10 @@ export default function ActivitiesPage({ userId, language, onRecordActivity }) {
         {t('Source: Sport Singapore via data.gov.sg. Facility availability is not shown.')}
       </div>
 
-      {activities.length === 0 ? (
+      {loading && <div className="loading">{t('Loading activities...')}</div>}
+      {error && <div className="error-msg">{error}</div>}
+
+      {!loading && !error && activities.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">🔍</div>
           {t('No activities found. Try a different filter.')}

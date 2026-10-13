@@ -21,6 +21,8 @@ class GlucoseLogRequest(BaseModel):
     notes: Optional[str] = Field(None, max_length=500)
     source: str = Field("user_entry", pattern="^(user_entry|DEMO/SYNTHETIC)$")
     photo_ref: Optional[str] = None
+    # Opt-in only: the note is shown in the doctor visit summary when true.
+    include_in_visit: bool = False
 
     @validator("recorded_date")
     def validate_date(cls, v):
@@ -40,6 +42,10 @@ class MedicationLogRequest(BaseModel):
     recorded_date: str = Field(...)
     notes: Optional[str] = Field(None, max_length=500)
     photo_ref: Optional[str] = None
+    # Optional free-text note for the doctor visit summary. Kept separate from
+    # `notes`, which already carries the generated "name dose - status" summary.
+    visit_note: Optional[str] = Field(None, max_length=500)
+    include_in_visit: bool = False
 
 
 class ActivityLogRequest(BaseModel):
@@ -49,6 +55,40 @@ class ActivityLogRequest(BaseModel):
     location: Optional[str] = Field(None, max_length=200)
     recorded_date: str = Field(...)
     notes: Optional[str] = Field(None, max_length=500)
+    # Optional, user-entered only. ZyPulse never estimates a heart rate and
+    # never infers intensity, fitness or clinical safety from it.
+    avg_heart_rate: Optional[int] = Field(None, ge=20, le=250)
+    # 'planned' -> stored as activity_planned and excluded from completed
+    # activity trends; 'completed' -> existing behaviour.
+    status: str = Field("completed", pattern="^(planned|completed)$")
+    # Synthetic Healthy 365 demo event the entry was created from (dedupe key).
+    source_event_id: Optional[str] = Field(None, max_length=60)
+    # Optional free-text note for the doctor visit summary (stored in
+    # visit_note; `notes` already holds the generated activity summary).
+    visit_note: Optional[str] = Field(None, max_length=500)
+    include_in_visit: bool = False
+
+
+class ActivityUpdateRequest(BaseModel):
+    activity_type: Optional[str] = Field(None, max_length=50)
+    duration_min: Optional[int] = Field(None, ge=0, le=600)
+    location: Optional[str] = Field(None, max_length=200)
+    recorded_date: Optional[str] = Field(None, max_length=10)
+    notes: Optional[str] = Field(None, max_length=500)
+    avg_heart_rate: Optional[int] = Field(None, ge=20, le=250)
+    # Set true to remove a previously stored average heart rate.
+    clear_heart_rate: bool = False
+    status: Optional[str] = Field(None, pattern="^(planned|completed)$")
+    visit_note: Optional[str] = Field(None, max_length=500)
+    include_in_visit: Optional[bool] = None
+
+
+class VisitNoteUpdateRequest(BaseModel):
+    """Edit the doctor-visit note and/or opt-in flag on any log record."""
+    include_in_visit: Optional[bool] = None
+    note: Optional[str] = Field(None, max_length=500)
+    # Set true to clear the stored note text.
+    clear_note: bool = False
 
 
 # ============================================================
@@ -160,6 +200,25 @@ class PhotoAttachResponse(BaseModel):
     message: Optional[str] = None
 
 
+class Healthy365RegisterRequest(BaseModel):
+    user_id: str = Field(..., min_length=1, max_length=100)
+    event_id: str = Field(..., min_length=1, max_length=60)
+
+
+class Healthy365RegisterResponse(BaseModel):
+    success: bool = True
+    simulated: bool = True
+    duplicate: bool = False
+    reg_id: Optional[int] = None
+    confirmation_id: Optional[str] = None
+    message: str
+    event_id: str
+    event_title: Optional[str] = None
+    disclaimer: str = (
+        "Demo simulation only. No real Healthy 365 registration or data transfer occurs."
+    )
+
+
 class HealthRecordResponse(BaseModel):
     record_id: int
     user_id: str
@@ -171,6 +230,8 @@ class HealthRecordResponse(BaseModel):
     notes: Optional[str]
     source: str
     photo_ref: Optional[str] = None
+    avg_heart_rate: Optional[int] = None
+    visit_note: Optional[str] = None
 
 
 # ============================================================

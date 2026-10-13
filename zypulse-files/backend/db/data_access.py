@@ -15,6 +15,19 @@ from ..time_utils import now_utc_iso
 from ..services import photo_storage
 
 
+# Which column holds the user's own doctor-visit text for each record type.
+VISIT_NOTE_TEXT_FIELD = {
+    "note": "value_text",
+    "meal": "notes",
+    "glucose_fasting": "notes",
+    "glucose_evening": "notes",
+    "medication_morning": "visit_note",
+    "medication_evening": "visit_note",
+    "activity": "visit_note",
+    "activity_planned": "visit_note",
+}
+
+
 class DataAccess:
     """Singleton-style data access. All DB operations go through here."""
 
@@ -40,6 +53,8 @@ class DataAccess:
         recorded_at: Optional[str] = None,
         include_in_visit_summary: bool = False,
         photo_ref: Optional[str] = None,
+        avg_heart_rate: Optional[int] = None,
+        visit_note: Optional[str] = None,
     ) -> int:
         """Insert a single health record."""
         if recorded_at is None:
@@ -48,22 +63,40 @@ class DataAccess:
         valid_types = [
             "glucose_fasting", "glucose_evening",
             "medication_morning", "medication_evening",
-            "activity", "note", "meal",
+            "activity", "activity_planned", "note", "meal",
         ]
         if record_type not in valid_types:
             raise ValueError(f"Invalid record_type: {record_type}. Must be one of {valid_types}")
 
+        # Optional columns are only written when supplied, so older callers and
+        # older databases keep NULL / their default value.
+        columns = [
+            "user_id", "record_type", "value_numeric", "value_text",
+            "recorded_date", "recorded_at", "notes", "source",
+            "include_in_visit_summary", "photo_ref",
+        ]
+        values = [
+            user_id, record_type, value_numeric, value_text,
+            recorded_date, recorded_at, notes, source,
+            1 if include_in_visit_summary else 0, photo_ref,
+        ]
+        if avg_heart_rate is not None:
+            columns.append("avg_heart_rate")
+            values.append(avg_heart_rate)
+        if visit_note is not None:
+            columns.append("visit_note")
+            values.append(visit_note)
+
         conn = self._conn()
         cursor = conn.execute(
             """
-            INSERT INTO health_records
-                (user_id, record_type, value_numeric, value_text,
-                 recorded_date, recorded_at, notes, source, include_in_visit_summary, photo_ref)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (user_id, record_type, value_numeric, value_text,
-             recorded_date, recorded_at, notes, source,
-             1 if include_in_visit_summary else 0, photo_ref),
+            INSERT INTO health_records ({columns})
+            VALUES ({placeholders})
+            """.format(
+                columns=", ".join(columns),
+                placeholders=", ".join(["?"] * len(columns)),
+            ),
+            values,
         )
         record_id = cursor.lastrowid
         conn.commit()
@@ -152,6 +185,109 @@ class DataAccess:
         conn.close()
         return [dict(row) for row in rows]
 
+    def find_activity_by_event(
+        self, user_id: str, source_event_id: str
+    ) -> List[Dict[str, Any]]:
+        """Find activity / planned-activity records already linked to a demo event.
+
+        Used to prevent duplicate Activity Log entries from repeated saving.
+        """
+        conn = self._conn()
+        rows = conn.execute(
+            """
+            SELECT * FROM health_records
+            WHERE user_id = ? AND record_type IN ('activity', 'activity_planned')
+            ORDER BY recorded_at DESC LIMIT 500
+            """,
+            (user_id,),
+        ).fetchall()
+        conn.close()
+        matches = []
+        for row in rows:
+            try:
+                meta = json.loads(row["value_text"] or "{}")
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if isinstance(meta, dict) and meta.get("source_event_id") == source_event_id:
+                matches.append(dict(row))
+        return matches
+
+    def update_activity_record(
+        self,
+        record_id: int,
+        record_type: Optional[str] = None,
+        activity_type: Optional[str] = None,
+        duration_min: Optional[int] = None,
+        location: Optional[str] = None,
+        recorded_date: Optional[str] = None,
+        notes: Optional[str] = None,
+        avg_heart_rate: Optional[int] = None,
+        clear_heart_rate: bool = False,
+        visit_note: Optional[str] = None,
+        include_in_visit: Optional[bool] = None,
+    ) -> bool:
+        """Edit an existing activity (or planned activity) record."""
+        conn = self._conn()
+        row = conn.execute(
+            "SELECT * FROM health_records WHERE record_id = ? AND record_type IN ('activity', 'activity_planned')",
+            (record_id,),
+        ).fetchone()
+        if not row:
+            conn.close()
+            raise ValueError(f"Activity record {record_id} not found")
+
+        current = dict(row)
+        try:
+            meta = json.loads(current.get("value_text") or "{}")
+        except (json.JSONDecodeError, TypeError):
+            meta = {}
+        if not isinstance(meta, dict):
+            meta = {}
+
+        if activity_type is not None:
+            meta["type"] = activity_type
+        if location is not None:
+            meta["location"] = location or None
+        new_type = record_type or current["record_type"]
+        new_duration = duration_min if duration_min is not None else current["value_numeric"]
+        new_date = recorded_date or current["recorded_date"]
+        new_notes = notes if notes is not None else current["notes"]
+
+        set_clause = "record_type = ?, value_numeric = ?, value_text = ?, recorded_date = ?, notes = ?, created_at = ?"
+        params: list = [
+            new_type, new_duration, json.dumps(meta, ensure_ascii=False),
+            new_date, new_notes, now_utc_iso(),
+        ]
+        if avg_heart_rate is not None:
+            set_clause += ", avg_heart_rate = ?"
+            params.append(avg_heart_rate)
+        elif clear_heart_rate:
+            set_clause += ", avg_heart_rate = NULL"
+        if visit_note is not None:
+            set_clause += ", visit_note = ?"
+            params.append(visit_note)
+        if include_in_visit is not None:
+            set_clause += ", include_in_visit_summary = ?"
+            params.append(1 if include_in_visit else 0)
+        set_clause += " WHERE record_id = ?"
+        params.append(record_id)
+
+        conn.execute(f"UPDATE health_records SET {set_clause}", params)
+        conn.commit()
+        conn.close()
+        return True
+
+    def delete_activity_record(self, record_id: int) -> bool:
+        """Delete an activity or planned activity record."""
+        conn = self._conn()
+        cursor = conn.execute(
+            "DELETE FROM health_records WHERE record_id = ? AND record_type IN ('activity', 'activity_planned')",
+            (record_id,),
+        )
+        conn.commit()
+        conn.close()
+        return cursor.rowcount > 0
+
     def get_unified_history(
         self,
         user_id: str,
@@ -200,6 +336,61 @@ class DataAccess:
         conn.commit()
         conn.close()
         return True
+
+    def set_record_visit_note(
+        self,
+        record_id: int,
+        include: Optional[bool] = None,
+        note: Optional[str] = None,
+        clear_note: bool = False,
+    ) -> Optional[Dict[str, Any]]:
+        """Edit the doctor-visit note + opt-in flag on ANY log record.
+
+        The text lives in the column the record type already uses:
+          * 'note'  -> value_text   (the note is the record itself)
+          * meal / glucose -> notes (the existing free-text field)
+          * medication / activity -> visit_note (their `notes` column already
+            holds a generated summary that must not be overwritten)
+        Older rows are unaffected: nothing is required and NULL stays NULL.
+        """
+        conn = self._conn()
+        row = conn.execute(
+            "SELECT * FROM health_records WHERE record_id = ?", (record_id,)
+        ).fetchone()
+        if not row:
+            conn.close()
+            return None
+        current = dict(row)
+        field = VISIT_NOTE_TEXT_FIELD.get(current["record_type"])
+
+        sets: list = []
+        params: list = []
+        if include is not None:
+            sets.append("include_in_visit_summary = ?")
+            params.append(1 if include else 0)
+        if field:
+            if note is not None:
+                sets.append(f"{field} = ?")
+                params.append(note)
+            elif clear_note and field != "value_text":
+                # 'note' records cannot have an empty value_text.
+                sets.append(f"{field} = NULL")
+        if not sets:
+            conn.close()
+            return current
+
+        sets.append("created_at = ?")
+        params.append(now_utc_iso())
+        params.append(record_id)
+        conn.execute(
+            f"UPDATE health_records SET {', '.join(sets)} WHERE record_id = ?", params
+        )
+        conn.commit()
+        updated = conn.execute(
+            "SELECT * FROM health_records WHERE record_id = ?", (record_id,)
+        ).fetchone()
+        conn.close()
+        return dict(updated) if updated else None
 
     # ---- Meals (logged as a single 'meal' record; items stored as JSON in value_text) ----
 
@@ -516,6 +707,7 @@ class DataAccess:
         purpose: str, fields_shared: List[str],
         consent_given: int = 0, consent_steps_completed: Optional[List[str]] = None,
         confirmation_id: Optional[str] = None, registered_at: Optional[str] = None,
+        source: str = "DEMO/SYNTHETIC",
     ) -> int:
         conn = self._conn()
         cursor = conn.execute(
@@ -523,13 +715,13 @@ class DataAccess:
             INSERT INTO registration_info
                 (user_id, activity_id, activity_title, consent_given,
                  consent_steps_completed, fields_shared, purpose,
-                 confirmation_id, registered_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 confirmation_id, registered_at, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (user_id, activity_id, activity_title, consent_given,
              json.dumps(consent_steps_completed or []),
              json.dumps(fields_shared),
-             purpose, confirmation_id, registered_at),
+             purpose, confirmation_id, registered_at, source),
         )
         reg_id = cursor.lastrowid
         conn.commit()
@@ -549,6 +741,32 @@ class DataAccess:
             WHERE reg_id = ?
             """,
             (consent_given, json.dumps(consent_steps_completed), confirmation_id, now_utc_iso(), reg_id),
+        )
+        conn.commit()
+        conn.close()
+        return True
+
+    def get_registrations(
+        self, user_id: str, activity_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Return stored (demo) registrations, newest first."""
+        conn = self._conn()
+        query = "SELECT * FROM registration_info WHERE user_id = ?"
+        params: list = [user_id]
+        if activity_id:
+            query += " AND activity_id = ?"
+            params.append(activity_id)
+        query += " ORDER BY reg_id DESC"
+        rows = conn.execute(query, params).fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    def set_confirmation(self, reg_id: int, confirmation_id: str) -> bool:
+        """Attach a mock confirmation id and timestamp to a stored registration."""
+        conn = self._conn()
+        conn.execute(
+            "UPDATE registration_info SET confirmation_id = ?, registered_at = ? WHERE reg_id = ?",
+            (confirmation_id, now_utc_iso(), reg_id),
         )
         conn.commit()
         conn.close()

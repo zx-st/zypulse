@@ -823,3 +823,148 @@ html.a11y-large-text { font-size: 112.5%; }
 .chip-fav { border-style: dashed; }
 
 
+
+/* ============================================================
+   Healthy 365 Connect (synthetic demo catalogue)
+   ============================================================ */
+.h365-demo-banner {
+  background: #fef3c7;
+  border: 1px dashed #f59e0b;
+  color: #92400e;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.h365-hint { font-size: 0.8rem; color: var(--gray); margin-bottom: 10px; }
+.h365-mode-chips { margin-bottom: 10px; }
+.h365-explain {
+  font-size: 0.78rem;
+  color: var(--gray-dark);
+  background: var(--gray-light);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+.h365-explain-sub { background: transparent; padding-top: 0; }
+.h365-event { align-items: flex-start; }
+.h365-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.h365-reason { background: var(--green-light); color: #15803d; }
+.h365-card-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.h365-card-panel .h365-meta { font-size: 0.85rem; margin-bottom: 4px; }
+.h365-desc { font-size: 0.85rem; color: var(--gray-dark); margin: 8px 0; }
+.h365-note { font-size: 0.75rem; color: var(--gray); margin-bottom: 6px; }
+.h365-detail-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.h365-add-block {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  margin-top: 10px;
+  background: var(--gray-light);
+}
+.h365-add-title { font-size: 0.85rem; font-weight: 600; }
+.h365-add-hint { font-size: 0.72rem; color: var(--gray); margin: 4px 0 8px; }
+.h365-add-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.h365-toast { margin-top: 8px; font-size: 0.78rem; color: var(--green); }
+.h365-draft-note {
+  font-size: 0.72rem;
+  color: var(--gray);
+  background: var(--gray-light);
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin-top: 6px;
+}
+.h365-duplicate { color: #92400e; background: #fef3c7; }
+.h365-footnote { font-size: 0.72rem; color: var(--gray); text-align: center; margin-top: 10px; }
+
+/* Simulated external-app handoff: deliberately unlike ZyPulse and unlike any
+   real government app - dark frame, dashed edges, permanent simulation ribbon. */
+.h365-handoff {
+  background: #0f172a;
+  border-radius: 16px;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+.h365-handoff-ribbon {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: #0f172a;
+  background: repeating-linear-gradient(135deg, #fde68a, #fde68a 10px, #fcd34d 10px, #fcd34d 20px);
+  border-radius: 6px;
+  padding: 4px 8px;
+  text-align: center;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+.h365-handoff-frame {
+  background: #111c33;
+  border: 1px dashed #334155;
+  border-radius: 12px;
+  max-width: 480px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+.h365-handoff-appbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #134e4a;
+  color: #ccfbf1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 10px 12px;
+}
+.h365-handoff-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #5eead4;
+  display: inline-block;
+}
+.h365-handoff-body { padding: 12px; }
+.h365-handoff-title { color: #f8fafc; font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+.h365-handoff-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  border-bottom: 1px solid #1e293b;
+  padding: 5px 0;
+}
+.h365-handoff-row b { color: #e2e8f0; font-weight: 600; text-align: right; }
+.h365-handoff-desc { color: #cbd5e1; font-size: 0.8rem; margin: 10px 0; }
+.h365-handoff-warning {
+  border: 1px dashed #f59e0b;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.12);
+  color: #fde68a;
+  font-size: 0.72rem;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  display: grid;
+  gap: 4px;
+}
+.h365-handoff-cta { width: 100%; background: #14b8a6; border-color: #14b8a6; }
+.h365-handoff-cta:hover { background: #0d9488; }
+.h365-handoff-result {
+  border: 1px solid #14b8a6;
+  border-radius: 10px;
+  background: rgba(20, 184, 166, 0.12);
+  padding: 10px;
+  margin-bottom: 10px;
+}
+.h365-handoff-result-title { color: #5eead4; font-size: 0.8rem; font-weight: 600; }
+.h365-handoff-conf { color: #e2e8f0; font-size: 0.78rem; margin-top: 6px; }
+.h365-handoff-conf-note { color: #94a3b8; font-size: 0.7rem; margin-top: 4px; }
+.h365-handoff .h365-add-block { background: rgba(148, 163, 184, 0.12); border-color: #334155; }
+.h365-handoff .h365-add-title { color: #e2e8f0; }
+.h365-handoff .h365-add-hint { color: #94a3b8; }
+.h365-handoff-back { width: 100%; background: #1e293b; color: #e2e8f0; border: 1px solid #334155; margin-top: 10px; }
+.h365-handoff-footnote { color: #94a3b8; font-size: 0.68rem; text-align: center; margin-top: 8px; }
+
+/* History: edit/delete activity + visit-note edit */
+.activity-edit { flex-direction: column; align-items: stretch; }
+.visit-note-edit { flex-direction: column; align-items: stretch; }

@@ -20,7 +20,8 @@ from typing import Optional
 import requests
 
 from ..models.schemas import (
-    GlucoseLogRequest, MedicationLogRequest, ActivityLogRequest,
+    GlucoseLogRequest, MedicationLogRequest, ActivityLogRequest, ActivityUpdateRequest,
+    VisitNoteUpdateRequest,
     ChatRequest, ChatResponse, DailyBriefingRequest, DailyBriefingResponse,
     TrendRequest, TrendResponse,
     PreferencesUpdate, PreferencesResponse,
@@ -28,12 +29,14 @@ from ..models.schemas import (
     MealLogRequest, MealUpdateRequest, MealItem,
     FoodItemResponse, PhotoAnalyzeRequest, PhotoAnalyzeResponse,
     PhotoUploadResponse, PhotoAttachResponse,
+    Healthy365RegisterRequest, Healthy365RegisterResponse,
 )
-from ..db.data_access import get_db
+from ..db.data_access import get_db, VISIT_NOTE_TEXT_FIELD
 from ..engine.calculations import CalculationEngine
 from ..engine.safety import SafetyEngine
 from ..engine.ai_orchestrator import AIOrchestrator
 from ..services.sport_facilities import sport_facilities_provider
+from ..services.healthy365 import Healthy365Service
 from ..services.reminders import dispatch_due_reminders
 from ..services.ai_usage import ai_usage_guard
 from ..services.photo_recognition import analyze as photo_analyze_svc, list_samples
@@ -47,6 +50,7 @@ safety_engine = SafetyEngine()
 db = get_db()
 calc_engine = CalculationEngine(db)
 ai_orchestrator = AIOrchestrator(safety_engine)
+healthy365_service = Healthy365Service(db)
 
 
 def _with_user_context(summary: dict, user_id: str) -> dict:
@@ -105,6 +109,7 @@ async def log_glucose(req: GlucoseLogRequest):
         source=req.source,
         recorded_at=now_utc_iso(),
         photo_ref=req.photo_ref,
+        include_in_visit_summary=req.include_in_visit,
     )
     db.add_audit_event("glucose_logged", "allow", f"record_id={record_id}, value={req.value}", req.user_id)
     return {"success": True, "record_id": record_id, "message": "Glucose reading saved."}
@@ -123,26 +128,151 @@ async def log_medication(req: MedicationLogRequest):
         source="user_entry",
         recorded_at=now_utc_iso(),
         photo_ref=req.photo_ref,
+        visit_note=req.visit_note,
+        include_in_visit_summary=req.include_in_visit,
     )
     db.add_audit_event("medication_logged", "allow", f"record_id={record_id}, status={req.status}", req.user_id)
     return {"success": True, "record_id": record_id, "message": "Medication status saved."}
 
 
+def _activity_notes(activity_type: str, duration_min: int, location: Optional[str], source_event_id: Optional[str]) -> str:
+    notes = f"{activity_type} - {duration_min}min"
+    if location:
+        notes += f" at {location}"
+    if source_event_id:
+        notes += f" (from Healthy 365 demo event {source_event_id})"
+    return notes
+
+
 @router.post("/logs/activity", response_model=dict)
 async def log_activity(req: ActivityLogRequest):
-    """Log activity. Deterministic storage, no AI."""
+    """Log activity. Deterministic storage, no AI.
+
+    ``status='planned'`` stores an `activity_planned` record, which is excluded
+    from completed-activity calculations. A simulated Healthy 365 registration
+    never creates or completes an entry on its own.
+    """
+    record_type = "activity_planned" if req.status == "planned" else "activity"
+    meta: dict = {"type": req.activity_type, "location": req.location}
+    if req.source_event_id:
+        meta["source_event_id"] = req.source_event_id
+
+    # De-duplicate: repeated saving of the same demo event must not add rows.
+    if req.source_event_id:
+        existing = db.find_activity_by_event(req.user_id, req.source_event_id)
+        same_status = [r for r in existing if r["record_type"] == record_type]
+        if same_status:
+            return {
+                "success": True,
+                "duplicate": True,
+                "record_id": same_status[0]["record_id"],
+                "message": "This demo event is already in your Activity Log.",
+            }
+        if existing and record_type == "activity":
+            # Promote the existing planned entry instead of creating a second row.
+            record_id = existing[0]["record_id"]
+            db.update_activity_record(
+                record_id,
+                record_type="activity",
+                activity_type=req.activity_type,
+                duration_min=req.duration_min,
+                location=req.location,
+                recorded_date=req.recorded_date,
+                notes=_activity_notes(req.activity_type, req.duration_min, req.location, req.source_event_id),
+                avg_heart_rate=req.avg_heart_rate,
+                visit_note=req.visit_note,
+                include_in_visit=req.include_in_visit,
+            )
+            db.add_audit_event(
+                "activity_logged", "allow",
+                f"record_id={record_id}, planned->completed, type={req.activity_type}", req.user_id,
+            )
+            return {"success": True, "duplicate": False, "record_id": record_id, "message": "Planned activity marked as completed."}
+
     record_id = db.add_health_record(
         user_id=req.user_id,
-        record_type="activity",
+        record_type=record_type,
         recorded_date=req.recorded_date,
         value_numeric=req.duration_min,
-        value_text=json.dumps({"type": req.activity_type, "location": req.location}),
-        notes=f"{req.activity_type} - {req.duration_min}min" + (f" at {req.location}" if req.location else ""),
+        value_text=json.dumps(meta, ensure_ascii=False),
+        notes=_activity_notes(req.activity_type, req.duration_min, req.location, req.source_event_id),
         source="user_entry",
         recorded_at=now_utc_iso(),
+        avg_heart_rate=req.avg_heart_rate,
+        visit_note=req.visit_note,
+        include_in_visit_summary=req.include_in_visit,
     )
-    db.add_audit_event("activity_logged", "allow", f"record_id={record_id}, type={req.activity_type}", req.user_id)
-    return {"success": True, "record_id": record_id, "message": "Activity saved."}
+    db.add_audit_event(
+        "activity_logged", "allow",
+        f"record_id={record_id}, type={req.activity_type}, status={req.status}", req.user_id,
+    )
+    return {
+        "success": True,
+        "duplicate": False,
+        "record_id": record_id,
+        "status": req.status,
+        "message": "Activity saved." if req.status == "completed" else "Planned activity saved (not counted as completed exercise).",
+    }
+
+
+@router.put("/logs/activity/{record_id}", response_model=dict)
+async def update_activity(record_id: int, req: ActivityUpdateRequest):
+    """Edit an existing activity or planned activity record."""
+    record_type = None
+    if req.status:
+        record_type = "activity_planned" if req.status == "planned" else "activity"
+    try:
+        db.update_activity_record(
+            record_id,
+            record_type=record_type,
+            activity_type=req.activity_type,
+            duration_min=req.duration_min,
+            location=req.location,
+            recorded_date=req.recorded_date,
+            notes=req.notes,
+            avg_heart_rate=req.avg_heart_rate,
+            clear_heart_rate=req.clear_heart_rate,
+            visit_note=req.visit_note,
+            include_in_visit=req.include_in_visit,
+        )
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Activity record not found")
+    db.add_audit_event("activity_updated", "allow", f"record_id={record_id}", None)
+    return {"success": True, "record_id": record_id, "message": "Activity updated."}
+
+
+@router.delete("/logs/activity/{record_id}", response_model=dict)
+async def delete_activity(record_id: int):
+    """Delete an activity or planned activity record."""
+    if not db.delete_activity_record(record_id):
+        raise HTTPException(status_code=404, detail="Activity record not found")
+    db.add_audit_event("activity_deleted", "allow", f"record_id={record_id}", None)
+    return {"success": True, "record_id": record_id, "message": "Activity deleted."}
+
+
+@router.put("/records/{record_id}/visit-note", response_model=dict)
+async def update_visit_note(record_id: int, req: VisitNoteUpdateRequest):
+    """Edit the doctor-visit note and/or opt-in flag on any log record.
+
+    Works for glucose, medication, activity (planned or completed), meal and
+    note records. The text is stored in the column that record type already
+    uses, so no record is migrated or duplicated.
+    """
+    updated = db.set_record_visit_note(
+        record_id,
+        include=req.include_in_visit,
+        note=req.note,
+        clear_note=req.clear_note,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return {
+        "success": True,
+        "record_id": record_id,
+        "record_type": updated["record_type"],
+        "include_in_visit": bool(updated.get("include_in_visit_summary", 0)),
+        "note": updated.get(VISIT_NOTE_TEXT_FIELD.get(updated["record_type"], "notes")),
+    }
 
 
 # ============================================================
@@ -368,7 +498,7 @@ _HISTORY_CATEGORY_MAP = {
     "all": None,
     "glucose": ["glucose_fasting", "glucose_evening"],
     "medication": ["medication_morning", "medication_evening"],
-    "activity": ["activity"],
+    "activity": ["activity", "activity_planned"],
     "notes": ["note"],
     "meals": ["meal"],
 }
@@ -689,3 +819,47 @@ async def search_activities(
             status_code=503,
             detail="Sports facility data is temporarily unavailable. Please try again later.",
         ) from exc
+
+
+# ============================================================
+# HEALTHY 365 CONNECT (synthetic demo catalogue + simulated handoff)
+# ============================================================
+
+@router.get("/healthy365/events", response_model=dict)
+async def healthy365_events(
+    user_id: str,
+    mode: str = "recommended",
+    limit: int = 20,
+):
+    """List the SYNTHETIC Healthy 365-style demo catalogue.
+
+    mode=recommended -> deterministic ranking from stored preferences only
+    (no AI). Falls back to the general catalogue when preferences are missing.
+    mode=nearest     -> area-based ordering; no distance is ever invented.
+    """
+    return healthy365_service.list_events(user_id, mode=mode, limit=limit)
+
+
+@router.get("/healthy365/events/{event_id}", response_model=dict)
+async def healthy365_event(event_id: str, user_id: str):
+    """Open one synthetic demo event, including its local log/registration state."""
+    event = healthy365_service.event_detail(user_id, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Demo event not found")
+    return event
+
+
+@router.post("/healthy365/register", response_model=Healthy365RegisterResponse)
+async def healthy365_register(req: Healthy365RegisterRequest):
+    """Simulated Healthy 365 registration.
+
+    Stored locally in the existing registration store with source
+    DEMO/SYNTHETIC_HEALTHY365. No request is made to Healthy 365, HPB or
+    Singpass, and no user data leaves the application. A demo registration is
+    never treated as attendance and never creates an activity record.
+    """
+    try:
+        result = healthy365_service.register(req.user_id, req.event_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Demo event not found")
+    return Healthy365RegisterResponse(**result)
