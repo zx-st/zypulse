@@ -18,7 +18,7 @@ const badgeLabel = {
   below_target: 'Below target',
 }
 
-export default function DailyBriefingPage({ userId, language, setPage }) {
+export default function DailyBriefingPage({ userId, language, setPage, onOpenExplore }) {
   const t = (text) => translateText(language, text)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
@@ -57,7 +57,7 @@ export default function DailyBriefingPage({ userId, language, setPage }) {
     <div className="daily-briefing">
       <section className="daily-welcome">
         <div>
-          <p className="daily-eyebrow">{t('YOUR DAILY BRIEFING')}</p><h1>{t('Good day, Mr Tan')}</h1><p>{t('Your verified self-care snapshot, in one place.')}</p>
+          <p className="daily-eyebrow">{t('Your daily briefing')}</p><h1>{t('Good day, Mr Tan')}</h1><p>{t('Your verified self-care snapshot, in one place.')}</p>
         </div>
       </section>
 
@@ -66,14 +66,14 @@ export default function DailyBriefingPage({ userId, language, setPage }) {
           <div className="risk-dial-inner"><strong>{signal.label}</strong><span>{t('attention')}</span></div>
         </div>
         <div className="risk-copy">
-          <p className="daily-eyebrow">{t("TODAY'S HEALTH RISK CHECK")}</p>
+          <p className="daily-eyebrow">{t("Today's health record check")}</p>
           <h2>{signal.headline}</h2>
           <p>{signal.detail}</p>
         </div>
       </section>
 
       <section className="daily-action-card">
-        <div className="daily-action-label">{t('ONE SMALL THING FOR TODAY')}</div>
+        <div className="daily-action-label">{t('One small thing for today')}</div>
         <h2>{action.title}</h2>
         <p>{action.description}</p>
         <button className="btn btn-primary daily-action-button" onClick={() => setPage(action.page)}>{action.button}</button>
@@ -97,6 +97,20 @@ export default function DailyBriefingPage({ userId, language, setPage }) {
         <div className="card-title">{t('Continue with ZyPulse')}</div>
         <div className="daily-links">
           <button onClick={() => setPage('log')}><span className="quick-action-icon">🩸</span><span>{t('Log a reading')}</span></button><button onClick={() => setPage('meals')}><span className="quick-action-icon">🍽️</span><span>{t('Add a meal')}</span></button><button onClick={() => setPage('trends')}><span className="quick-action-icon">📈</span><span>{t('View trends')}</span></button><button onClick={() => setPage('chat')}><span className="quick-action-icon">💬</span><span>{t('Ask Coach')}</span></button>
+        </div>
+      </section>
+
+      <section className="card daily-explore-card">
+        <div className="card-title">{t('Explore')}</div>
+        <div className="daily-explore-shortcuts">
+          <button type="button" className="daily-explore-btn" onClick={() => onOpenExplore?.('events')}>
+            <span aria-hidden="true">🎉</span>
+            <span>{t('Explore Healthy365 Events')}</span>
+          </button>
+          <button type="button" className="daily-explore-btn" onClick={() => onOpenExplore?.('facilities')}>
+            <span aria-hidden="true">🏟️</span>
+            <span>{t('Find Nearby Sports Facilities')}</span>
+          </button>
         </div>
       </section>
 

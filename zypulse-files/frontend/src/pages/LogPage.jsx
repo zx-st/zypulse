@@ -2,6 +2,15 @@ import { useState } from 'react'
 import { api } from '../api/client.js'
 import { translateText } from '../i18n.jsx'
 import PhotoLogWorkflow from '../components/PhotoLogWorkflow.jsx'
+import MealLogPage from './MealLogPage.jsx'
+
+// Record = one destination. Glucose / Medication / Activity / Meals as top tabs.
+const RECORD_TABS = [
+  { key: 'glucose', icon: '🩸', label: 'Glucose' },
+  { key: 'medication', icon: '💊', label: 'Medication' },
+  { key: 'activity', icon: '🏃', label: 'Activity' },
+  { key: 'meals', icon: '🍽️', label: 'Meals' },
+]
 
 export default function LogPage({ userId, language, initialTab = 'glucose', initialLocation = '', activityDraft = null }) {
   const t = (text) => translateText(language, text)
@@ -170,21 +179,26 @@ export default function LogPage({ userId, language, initialTab = 'glucose', init
       <div className="card">
         <div className="card-title">📝 {t('Record Your Self-Care')}</div>
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {['glucose', 'medication', 'activity'].map(t => (
+        <div className="zv-tabs zv-tabs--record" role="tablist" aria-label="Record">
+          {RECORD_TABS.map((item) => (
             <button
-              key={t}
-              className={`btn ${tab === t ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ flex: 1, fontSize: '0.85rem', padding: '8px' }}
-              onClick={() => { setTab(t); setSuccess(null); setError(null); }}
+              key={item.key}
+              type="button"
+              role="tab"
+              className="zv-tab"
+              aria-selected={tab === item.key}
+              onClick={() => { setTab(item.key); setSuccess(null); setError(null); }}
             >
-              {t === 'glucose' ? `🩸 ${translateText(language, 'Glucose')}` : t === 'medication' ? `💊 ${translateText(language, 'Medication')}` : `🏃 ${translateText(language, 'Activity')}`}
+              <span aria-hidden="true">{item.icon}</span>
+              {translateText(language, item.label)}
             </button>
           ))}
         </div>
 
         {success && <div className="success-msg">{success}</div>}
         {error && <div className="error-msg">{error}</div>}
+
+        {tab === 'meals' && <MealLogPage userId={userId} language={language} />}
 
         {tab === 'glucose' && (
           <>
