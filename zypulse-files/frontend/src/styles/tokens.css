@@ -1,0 +1,59 @@
+/* ZyPulse — Fresh Vitality + Hackathon polish */
+/* No new design system, only refinements. */
+/* Imported once from global.css — see @import at the top of that file. */
+
+:root {
+  /* Colour */
+  --color-primary:    #0F8A85;   /* teal — ZyPulse identity */
+  --color-primary-dark: #0A6B67; /* darker teal for text/fill (contrast) */
+  --color-accent:     #1FB6A8;   /* mint */
+  --color-bg:         #F7FAF9;   /* page */
+  --color-surface:    #FFFFFF;   /* card / sheet */
+  --color-border:     #E6EFEC;
+  --color-ink:        #0B1F1D;   /* primary text */
+  --color-muted:      #5C6B68;   /* secondary text */
+  --color-ok:         #1FB6A8;
+  --color-warn:       #8A5A00;   /* darkened from #E0A100 for AA text contrast */
+  --color-warn-surface: #FBF3DE;
+  --color-risk:       #C8462C;   /* always pair with icon */
+  --color-focus:      #0F8A85;   /* focus ring */
+
+  /* Type */
+  --font-sans: system-ui, -apple-system, "Segoe UI", "Inter", sans-serif;
+  --fs-body:   16px;
+  --fs-body-lg:17px;
+  --fs-h3:     18px;
+  --fs-h2:     20px;
+  --fs-h1:     24px;
+  --fs-hero:   30px;
+  --lh-tight:  1.25;
+  --lh-normal: 1.5;
+
+  /* Space */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px;
+  --s-4: 16px; --s-5: 20px; --s-6: 24px;
+  --s-7: 32px; --s-8: 40px; --s-9: 48px;
+
+  /* Radius (moderate) */
+  --r-input:   8px;
+  --r-card:   12px;
+  --r-pill: 999px;
+
+  /* Elevation */
+  --shadow-1: 0 1px 2px rgba(11,31,29,.06), 0 2px 8px rgba(11,31,29,.04);
+  --shadow-2: 0 4px 16px rgba(11,31,29,.08);
+
+  /* Touch target minimum */
+  --tap: 44px;
+
+  /* Breakpoint reference (documentation only).
+     NOTE: the handoff declared these as bare top-level declarations, which is
+     invalid CSS. Custom properties also cannot be used inside media queries,
+     so they are kept here as documentation; the real values are written
+     literally in the @media blocks in global.css. */
+  --bp-sm: 360px;
+  --bp-md: 390px;
+  --bp-tablet: 768px;
+  --bp-laptop: 1024px;
+  --bp-desktop: 1440px;
+}
